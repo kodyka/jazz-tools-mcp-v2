@@ -17,6 +17,7 @@ const TEST_ENV = "dev";
 const TEST_BRANCH = "main";
 const TEST_PORT = 19879;
 const SERVER_URL = `http://127.0.0.1:${TEST_PORT}`;
+const TEST_BROKER_WORKER_URL = "/__jazz/test-broker-worker.js";
 
 function HostInner() {
   const { db } = useJazzClient();
@@ -59,6 +60,13 @@ function HostApp() {
     userBranch: TEST_BRANCH,
     serverUrl: SERVER_URL,
     secret,
+    // The extracted Inspector consumes the published jazz-tools package. Give
+    // the host an explicit broker URL served by the browser test so Vite's
+    // node_modules URL rewriting cannot change SharedWorker identity. The host
+    // handle forwards this exact URL to the embedded Inspector.
+    runtimeSources: {
+      brokerWorkerUrl: new URL(TEST_BROKER_WORKER_URL, window.location.origin).href,
+    },
   };
 
   return (
