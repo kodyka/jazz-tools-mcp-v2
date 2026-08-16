@@ -17,7 +17,9 @@ const TEST_ENV = "dev";
 const TEST_BRANCH = "main";
 const TEST_PORT = 19879;
 const SERVER_URL = `http://127.0.0.1:${TEST_PORT}`;
+const TEST_WORKER_URL = "/__jazz/test-worker.js";
 const TEST_BROKER_WORKER_URL = "/__jazz/test-broker-worker.js";
+const TEST_WASM_URL = "/__jazz/test-runtime.wasm";
 
 function HostInner() {
   const { db } = useJazzClient();
@@ -54,6 +56,7 @@ function HostApp() {
     return <p id="host-status">Authenticating...</p>;
   }
 
+  const origin = window.location.origin;
   const config: DbConfig = {
     appId: APP_ID,
     env: TEST_ENV,
@@ -61,11 +64,14 @@ function HostApp() {
     serverUrl: SERVER_URL,
     secret,
     // The extracted Inspector consumes the published jazz-tools package. Give
-    // the host an explicit broker URL served by the browser test so Vite's
-    // node_modules URL rewriting cannot change SharedWorker identity. The host
-    // handle forwards this exact URL to the embedded Inspector.
+    // the host explicit, same-origin runtime URLs served by the Vite browser
+    // fixture. installInspectorHost forwards these exact values to the embedded
+    // Inspector, so the host and iframe share Worker/SharedWorker identity and
+    // use the same WASM binary rather than depending on bundle-relative paths.
     runtimeSources: {
-      brokerWorkerUrl: new URL(TEST_BROKER_WORKER_URL, window.location.origin).href,
+      workerUrl: new URL(TEST_WORKER_URL, origin).href,
+      brokerWorkerUrl: new URL(TEST_BROKER_WORKER_URL, origin).href,
+      wasmUrl: new URL(TEST_WASM_URL, origin).href,
     },
   };
 
