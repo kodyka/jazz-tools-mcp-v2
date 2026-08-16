@@ -19,7 +19,7 @@ export function createMcpServer(connector: JazzConnector): McpServer {
     "jazz_status",
     {
       description:
-        "Check the configured jazz-tools@alpha server, loaded schema, auth mode, and write safety settings.",
+        "Check the configured jazz-tools@alpha server, loaded schema, privileged auth mode, and write safety settings.",
       annotations: { readOnlyHint: true },
     },
     async () => toolResult(await connector.status()),
@@ -51,7 +51,7 @@ export function createMcpServer(connector: JazzConnector): McpServer {
     "jazz_describe_table",
     {
       description:
-        "Return the official Jazz WASM schema descriptor for one table, including columns, types, references, nullability, and defaults when present.",
+        "Return the official Jazz WASM schema descriptor for one table plus supported query-time magic columns.",
       inputSchema: z.object({ table: z.string().min(1) }),
       annotations: { readOnlyHint: true },
     },
@@ -62,7 +62,7 @@ export function createMcpServer(connector: JazzConnector): McpServer {
     "jazz_query",
     {
       description:
-        "Query a Jazz table through Jazz's native query builder. `where` values may be scalars (eq) or operator objects such as {gt: 5}, {contains: \"foo\"}, or {in: [...]}. This is not SQL.",
+        "Query a Jazz table through Jazz's native query builder. `where` values may be scalars (eq) or type-supported operator objects such as {gt: 5}, {contains: \"foo\"}, or {in: [...]}. Conditions are AND-combined; query-level OR is not supported. Magic columns such as $createdBy/$updatedAt may be selected or filtered. This is not SQL.",
       inputSchema: z.object({
         table: z.string().min(1),
         where: whereSchema.optional(),
@@ -93,7 +93,7 @@ export function createMcpServer(connector: JazzConnector): McpServer {
     "jazz_insert",
     {
       description:
-        "Insert a row using Jazz's native local-first mutation API. Disabled unless JAZZ_MCP_ALLOW_WRITES=true.",
+        "Insert a row using Jazz's native local-first mutation API with privileged backend access. Disabled unless JAZZ_MCP_ALLOW_WRITES=true.",
       inputSchema: z.object({
         table: z.string().min(1),
         values: valuesSchema,
@@ -107,13 +107,13 @@ export function createMcpServer(connector: JazzConnector): McpServer {
     "jazz_update",
     {
       description:
-        "Update fields on one Jazz row and wait for configured durability. Disabled unless JAZZ_MCP_ALLOW_WRITES=true.",
+        "Update fields on one Jazz row with privileged backend access and wait for configured durability. Disabled unless JAZZ_MCP_ALLOW_WRITES=true.",
       inputSchema: z.object({
         table: z.string().min(1),
         id: z.string().min(1),
         values: valuesSchema,
       }),
-      annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true },
+      annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false },
     },
     async ({ table, id, values }) =>
       toolResult({ row: await connector.update(table, id, values) }),
@@ -123,9 +123,9 @@ export function createMcpServer(connector: JazzConnector): McpServer {
     "jazz_delete",
     {
       description:
-        "Delete one Jazz row through Jazz's native delete operation. Disabled unless JAZZ_MCP_ALLOW_WRITES=true.",
+        "Delete one Jazz row with privileged backend access through Jazz's native delete operation. Disabled unless JAZZ_MCP_ALLOW_WRITES=true.",
       inputSchema: z.object({ table: z.string().min(1), id: z.string().min(1) }),
-      annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true },
+      annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: false },
     },
     async ({ table, id }) => toolResult(await connector.delete(table, id)),
   );
