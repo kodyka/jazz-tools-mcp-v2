@@ -9,9 +9,10 @@ import { createJazzContext, type JazzContext } from "jazz-tools/backend";
 import type { ConnectorConfig } from "./config.js";
 import {
   GenericQueryBuilder,
-  assertColumns,
+  assertQueryableColumns,
   assertTable,
-  assertWhereColumns,
+  assertWhereInput,
+  assertWritableColumns,
   dynamicTableProxy,
   type GenericWhereInput,
   type OrderByInput,
@@ -81,6 +82,7 @@ export class JazzConnector {
       allowWrites: this.config.allowWrites,
       durability: this.config.durability,
       authMode: this.config.backendSecret ? "backend-secret" : "admin-secret",
+      accessScope: "privileged-backend",
       attribution: this.config.backendSecret
         ? (this.config.principal ?? "jazz:system")
         : "runtime/default",
@@ -101,16 +103,25 @@ export class JazzConnector {
     return {
       name: tableName,
       ...schema[tableName],
+      queryMagicColumns: [
+        "$canRead",
+        "$canEdit",
+        "$canDelete",
+        "$createdBy",
+        "$createdAt",
+        "$updatedBy",
+        "$updatedAt",
+      ],
     } as Record<string, unknown>;
   }
 
   async query(input: QueryInput): Promise<DynamicTableRow[]> {
     const { schema, db } = await this.ensureLoaded();
     assertTable(schema, input.table);
-    assertWhereColumns(schema, input.table, input.where);
-    if (input.select) assertColumns(schema, input.table, input.select);
+    assertWhereInput(schema, input.table, input.where);
+    if (input.select) assertQueryableColumns(schema, input.table, input.select);
     if (input.orderBy) {
-      assertColumns(
+      assertQueryableColumns(
         schema,
         input.table,
         input.orderBy.map((item) => item.column),
@@ -135,7 +146,7 @@ export class JazzConnector {
     this.assertWritesEnabled();
     const { schema, db } = await this.ensureLoaded();
     assertTable(schema, table);
-    assertColumns(schema, table, Object.keys(values));
+    assertWritableColumns(schema, table, Object.keys(values));
     const proxy = dynamicTableProxy(table, schema);
     return await db.insert(proxy, values).wait({ tier: this.config.durability });
   }
@@ -148,7 +159,7 @@ export class JazzConnector {
     this.assertWritesEnabled();
     const { schema, db } = await this.ensureLoaded();
     assertTable(schema, table);
-    assertColumns(schema, table, Object.keys(values));
+    assertWritableColumns(schema, table, Object.keys(values));
     const proxy = dynamicTableProxy(table, schema);
     await db.update(proxy, id, values).wait({ tier: this.config.durability });
     return await this.getRow(table, id);
