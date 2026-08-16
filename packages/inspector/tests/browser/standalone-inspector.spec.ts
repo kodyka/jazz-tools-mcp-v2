@@ -86,8 +86,8 @@ test.describe("connection page", () => {
   test("connects to server, shows schema selection and loads data explorer", async ({ page }) => {
     await page.goto("/");
     await page.getByLabel("Server URL").fill(SERVER_URL);
-    await page.getByLabel("App ID")).fill(APP_ID);
-    await page.getByLabel("Admin secret")).fill(ADMIN_SECRET);
+    await page.getByLabel("App ID").fill(APP_ID);
+    await page.getByLabel("Admin secret").fill(ADMIN_SECRET);
     await page.getByRole("button", { name: "Connect" }).click();
 
     await expect(page.getByRole("heading", { name: "Select schema" })).toBeVisible();
