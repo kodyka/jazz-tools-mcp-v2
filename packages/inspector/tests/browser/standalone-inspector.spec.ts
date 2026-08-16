@@ -1,9 +1,12 @@
 import { expect, test, type Page } from "@playwright/test";
+import { createJazzContext } from "jazz-tools/backend";
+import { app, permissions } from "./schema.js";
 import { ADMIN_SECRET, APP_ID, TEST_BRANCH, TEST_ENV, TEST_PORT } from "./test-constants.js";
 
 const SERVER_URL = `http://127.0.0.1:${TEST_PORT}`;
 const SCHEMA_HASH = process.env.PUBLISHED_SCHEMA_HASH;
 const STORAGE_KEY = "jazz-inspector-standalone-config";
+const TEST_BACKEND_SECRET = "test";
 
 function storedConfig() {
   return {
@@ -34,7 +37,7 @@ async function storeStandaloneConfig(page: Page) {
 }
 
 async function expectTodosTableLoaded(page: Page) {
-  await expect(page.getByRole("heading", { name: "Tables" })).toBeVisible({ timeout: 15_000 });
+  await expect(page.getByRole("heading", { name: "Database" })).toBeVisible({ timeout: 15_000 });
   await expect(page.getByRole("link", { name: "Schema" })).toBeVisible({ timeout: 5_000 });
   await expect(page.getByRole("checkbox", { name: /Toggle done for/ }).first()).toBeVisible({
     timeout: 15_000,
@@ -101,7 +104,7 @@ test.describe("connection page", () => {
     await page.reload();
 
     await expect(page.getByRole("link", { name: "Data Explorer" })).toBeVisible();
-    await expect(page.getByRole("heading", { name: "Tables" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Database" })).toBeVisible();
     await expect(page.getByRole("link", { name: "View todos data" })).toBeVisible();
   });
 
@@ -142,14 +145,14 @@ test.describe("data explorer page", () => {
   test("loads schema explorer", async ({ page }) => {
     await page.getByRole("link", { name: "Schema" }).click();
 
-    await expect(page.getByText('"name": "title"')).toBeVisible();
-    await expect(page.getByText('"type": "Text"')).toBeVisible();
-    await expect(page.getByText('"name": "done"')).toBeVisible();
-    await expect(page.getByText('"type": "Boolean"')).toBeVisible();
+    await expect(page.getByText('\"name\": \"title\"')).toBeVisible();
+    await expect(page.getByText('\"type\": \"Text\"')).toBeVisible();
+    await expect(page.getByText('\"name\": \"done\"')).toBeVisible();
+    await expect(page.getByText('\"type\": \"Boolean\"')).toBeVisible();
     await expect(page.getByRole("heading", { name: "todos permissions" })).toBeVisible();
-    await expect(page.getByText('"insert"')).toBeVisible();
-    await expect(page.getByText('"update"')).toBeVisible();
-    await expect(page.getByText('"delete"')).toBeVisible();
+    await expect(page.getByText('\"insert\"')).toBeVisible();
+    await expect(page.getByText('\"update\"')).toBeVisible();
+    await expect(page.getByText('\"delete\"')).toBeVisible();
   });
 
   test("opens inline text editor in selected row", async ({ page }) => {
@@ -274,6 +277,41 @@ test.describe("data explorer page", () => {
 
     for (let index = 0; index < checkboxCount; index += 1) {
       await expect(checkboxes.nth(index)).toBeChecked();
+    }
+  });
+
+  test("reacts to insert, update, and delete from a second Jazz writer without refresh", async ({
+    page,
+  }) => {
+    const context = createJazzContext({
+      appId: APP_ID,
+      app,
+      permissions,
+      driver: { type: "memory" },
+      serverUrl: SERVER_URL,
+      backendSecret: TEST_BACKEND_SECRET,
+      env: TEST_ENV,
+      userBranch: TEST_BRANCH,
+      defaultDurabilityTier: "global",
+    });
+    const externalWriter = context.asBackend();
+    const title = `External realtime ${Date.now()}`;
+
+    try {
+      const created = externalWriter.insert(app.todos, { title, done: false });
+      await created.wait({ tier: "global" });
+
+      const externalRow = rowByTitle(page, title);
+      await expect(externalRow).toBeVisible({ timeout: 15_000 });
+      await expect(externalRow.getByRole("checkbox")).not.toBeChecked();
+
+      await externalWriter.update(app.todos, created.id, { done: true }).wait({ tier: "global" });
+      await expect(externalRow.getByRole("checkbox")).toBeChecked({ timeout: 15_000 });
+
+      await externalWriter.delete(app.todos, created.id).wait({ tier: "global" });
+      await expect(externalRow).toHaveCount(0, { timeout: 15_000 });
+    } finally {
+      await context.shutdown();
     }
   });
 });
