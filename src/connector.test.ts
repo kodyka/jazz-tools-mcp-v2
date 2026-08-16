@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { pickLatestSchemaHash } from "./connector.js";
 import {
   GenericQueryBuilder,
+  assertOrderByColumns,
   assertQueryableColumns,
   assertWhereInput,
   assertWritableColumns,
@@ -16,6 +17,8 @@ const schema = {
       { name: "title", column_type: { type: "Text" }, nullable: false },
       { name: "done", column_type: { type: "Boolean" }, nullable: false },
       { name: "priority", column_type: { type: "Integer" }, nullable: false },
+      { name: "payload", column_type: { type: "Json" }, nullable: false },
+      { name: "blob", column_type: { type: "Bytea" }, nullable: false },
     ],
   },
 } as unknown as WasmSchema;
@@ -89,6 +92,14 @@ test("where validation rejects operators not supported by the column type", () =
   assert.doesNotThrow(() =>
     assertWhereInput(schema, "todos", { priority: { gte: 2, lt: 10 } }),
   );
+});
+
+test("orderBy validation rejects Jazz Bytea and Json columns", () => {
+  assert.doesNotThrow(() =>
+    assertOrderByColumns(schema, "todos", ["title", "priority", "$updatedAt"]),
+  );
+  assert.throws(() => assertOrderByColumns(schema, "todos", ["payload"]), /orderBy/);
+  assert.throws(() => assertOrderByColumns(schema, "todos", ["blob"]), /orderBy/);
 });
 
 test("mutation validation rejects id and magic columns", () => {
