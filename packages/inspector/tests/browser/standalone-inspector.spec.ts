@@ -86,15 +86,14 @@ test.describe("connection page", () => {
   test("connects to server, shows schema selection and loads data explorer", async ({ page }) => {
     await page.goto("/");
     await page.getByLabel("Server URL").fill(SERVER_URL);
-    await page.getByLabel("App ID").fill(APP_ID);
-    await page.getByLabel("Admin secret").fill(ADMIN_SECRET);
+    await page.getByLabel("App ID")).fill(APP_ID);
+    await page.getByLabel("Admin secret")).fill(ADMIN_SECRET);
     await page.getByRole("button", { name: "Connect" }).click();
 
     await expect(page.getByRole("heading", { name: "Select schema" })).toBeVisible();
     await expect(page.getByRole("option")).toHaveCount(2);
 
     await page.getByLabel("Schema hash").selectOption({ index: 1 });
-
     await page.getByRole("button", { name: "Use schema" }).click();
 
     await expect(page.getByRole("link", { name: "Data Explorer" })).toBeVisible();
@@ -116,7 +115,6 @@ test.describe("connection page", () => {
     await page.reload();
 
     await expect(page.getByRole("button", { name: "Connections" })).toBeVisible();
-
     await page.getByRole("button", { name: "Connections" }).click();
 
     await expect(page.getByRole("heading", { name: "Connections" })).toBeVisible();
@@ -232,18 +230,12 @@ test.describe("data explorer page", () => {
   });
 
   test("filters rows to done=true and shows only checked boolean cells", async ({ page }) => {
-    const visibleCheckboxesBeforeFilter = page.getByRole("checkbox", { name: /Toggle done for/ });
-    await expect
-      .poll(async () => await visibleCheckboxesBeforeFilter.count(), { timeout: 15_000 })
-      .toBeGreaterThan(0);
-    const visibleCheckboxCountBeforeFilter = await visibleCheckboxesBeforeFilter.count();
-    expect(visibleCheckboxCountBeforeFilter).toBeGreaterThan(0);
-
-    let uncheckedBeforeFilter = 0;
-    for (let index = 0; index < visibleCheckboxCountBeforeFilter; index += 1) {
-      if (!(await visibleCheckboxesBeforeFilter.nth(index).isChecked())) uncheckedBeforeFilter += 1;
-    }
-    expect(uncheckedBeforeFilter).toBeGreaterThan(0);
+    const firstTodo = rowByTitle(page, "First seeded todo");
+    const secondTodo = rowByTitle(page, "Second seeded todo");
+    await expect(firstTodo).toBeVisible({ timeout: 15_000 });
+    await expect(secondTodo).toBeVisible({ timeout: 15_000 });
+    await expect(firstTodo.getByRole("checkbox")).not.toBeChecked();
+    await expect(secondTodo.getByRole("checkbox")).toBeChecked();
 
     const filterRegion = page.getByRole("region", { name: "Filter rows" });
     await filterRegion.getByLabel("Column", { exact: true }).selectOption("done");
@@ -251,10 +243,10 @@ test.describe("data explorer page", () => {
     await filterRegion.getByRole("button", { name: "Add where clause" }).click();
     await expect(filterRegion.getByText("done eq true", { exact: true })).toBeVisible();
 
+    await expect(firstTodo).toHaveCount(0, { timeout: 15_000 });
     const checkboxes = page.getByRole("checkbox", { name: /Toggle done for/ });
     await expect.poll(async () => await checkboxes.count(), { timeout: 15_000 }).toBeGreaterThan(0);
     const checkboxCount = await checkboxes.count();
-    expect(checkboxCount).toBeGreaterThan(0);
     for (let index = 0; index < checkboxCount; index += 1) {
       await expect(checkboxes.nth(index)).toBeChecked();
     }
