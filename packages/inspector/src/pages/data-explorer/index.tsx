@@ -1,4 +1,4 @@
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Group, Panel, Separator } from "react-resizable-panels";
 import { NavLink, Outlet, useNavigate, useOutletContext, useParams } from "react-router";
 import { useDevtoolsContext } from "../../contexts/devtools-context.js";
@@ -6,12 +6,17 @@ import { useLocalStorageState } from "../../utility/use-local-storage-state.js";
 import styles from "./index.module.css";
 
 const TABLES_SIDEBAR_SIZE_STORAGE_KEY = "jazz.inspector.dataExplorer.tablesSidebarSize";
-const TABLES_SIDEBAR_DEFAULT_SIZE = 10;
-const TABLES_SIDEBAR_MIN_SIZE = 7;
+const TABLES_SIDEBAR_DEFAULT_SIZE = 16;
+const TABLES_SIDEBAR_MIN_SIZE = 10;
 const TABLES_SIDEBAR_MAX_SIZE = 30;
 
 interface DataExplorerOutletContext {
   isTablesPanelOpen: boolean;
+}
+
+interface TableNavigationItem {
+  name: string;
+  columnCount: number;
 }
 
 function isTablesSidebarSize(value: unknown): value is number {
@@ -23,32 +28,167 @@ function isTablesSidebarSize(value: unknown): value is number {
   );
 }
 
+function SearchIcon() {
+  return (
+    <svg
+      width="14"
+      height="14"
+      viewBox="0 0 16 16"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.5"
+      strokeLinecap="round"
+      aria-hidden="true"
+    >
+      <circle cx="7" cy="7" r="4" />
+      <path d="m10 10 3 3" />
+    </svg>
+  );
+}
+
+function TableIcon() {
+  return (
+    <svg
+      width="14"
+      height="14"
+      viewBox="0 0 16 16"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.25"
+      aria-hidden="true"
+    >
+      <rect x="2.5" y="3" width="11" height="10" rx="1.25" />
+      <path d="M2.5 6.25h11M6.25 6.25V13" />
+    </svg>
+  );
+}
+
+function SchemaIcon() {
+  return (
+    <svg
+      width="13"
+      height="13"
+      viewBox="0 0 16 16"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.25"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <path d="M5 3.5h6M5 8h6M5 12.5h6" />
+      <circle cx="3" cy="3.5" r=".75" />
+      <circle cx="3" cy="8" r=".75" />
+      <circle cx="3" cy="12.5" r=".75" />
+    </svg>
+  );
+}
+
 interface TablesSidebarProps {
-  tableNames: string[];
+  tables: TableNavigationItem[];
   selectedTableName?: string;
 }
 
-function TablesSidebar({ tableNames, selectedTableName }: TablesSidebarProps) {
+function TablesSidebar({ tables, selectedTableName }: TablesSidebarProps) {
+  const [search, setSearch] = useState("");
+  const normalizedSearch = search.trim().toLowerCase();
+  const visibleTables = useMemo(
+    () =>
+      normalizedSearch.length === 0
+        ? tables
+        : tables.filter((table) => table.name.toLowerCase().includes(normalizedSearch)),
+    [normalizedSearch, tables],
+  );
+
   return (
     <aside className={styles.sidebar}>
       <div className={styles.sidebarHeader}>
-        <h2 className={styles.sidebarTitle}>Tables</h2>
+        <div>
+          <h2 className={styles.sidebarTitle}>Database</h2>
+          <p className={styles.sidebarMeta}>
+            {tables.length} table{tables.length === 1 ? "" : "s"}
+          </p>
+        </div>
       </div>
-      <ul className={styles.tableList}>
-        {tableNames.map((tableName) => (
-          <li key={tableName}>
-            <NavLink
-              to={`/data-explorer/${tableName}/data`}
-              className={`${styles.tableLink} ${
-                selectedTableName === tableName ? styles.tableLinkActive : ""
-              }`}
-              aria-label={`View ${tableName} data`}
-            >
-              {tableName}
-            </NavLink>
-          </li>
-        ))}
-      </ul>
+
+      <label className={styles.searchBox}>
+        <span className={styles.searchIcon}>
+          <SearchIcon />
+        </span>
+        <input
+          className={styles.searchInput}
+          aria-label="Search tables"
+          placeholder="Search tables..."
+          value={search}
+          onChange={(event) => setSearch(event.target.value)}
+        />
+        {search ? (
+          <button
+            type="button"
+            className={styles.clearSearchButton}
+            aria-label="Clear table search"
+            onClick={() => setSearch("")}
+          >
+            ×
+          </button>
+        ) : null}
+      </label>
+
+      <div className={styles.objectSectionHeader}>
+        <span>Tables</span>
+        <span>{visibleTables.length}</span>
+      </div>
+
+      {visibleTables.length > 0 ? (
+        <ul className={styles.tableList}>
+          {visibleTables.map((table) => {
+            const isSelected = selectedTableName === table.name;
+            return (
+              <li key={table.name} className={styles.tableListItem}>
+                <div className={`${styles.tableRow} ${isSelected ? styles.tableRowActive : ""}`}>
+                  <NavLink
+                    to={`/data-explorer/${table.name}/data`}
+                    className={styles.tableLink}
+                    aria-label={`View ${table.name} data`}
+                  >
+                    <span className={styles.tableIcon}>
+                      <TableIcon />
+                    </span>
+                    <span className={styles.tableName}>{table.name}</span>
+                    <span
+                      className={styles.columnCount}
+                      title={`${table.columnCount} column${table.columnCount === 1 ? "" : "s"}`}
+                    >
+                      {table.columnCount}
+                    </span>
+                  </NavLink>
+                  <NavLink
+                    to={`/data-explorer/${table.name}/schema`}
+                    className={({ isActive }) =>
+                      `${styles.schemaLink} ${isActive ? styles.schemaLinkActive : ""}`
+                    }
+                    aria-label={`View ${table.name} schema`}
+                    title={`${table.name} schema`}
+                  >
+                    <SchemaIcon />
+                  </NavLink>
+                </div>
+              </li>
+            );
+          })}
+        </ul>
+      ) : (
+        <div className={styles.noMatches}>
+          <span>No tables match</span>
+          <strong>{search}</strong>
+        </div>
+      )}
+
+      <div className={styles.sidebarFooter}>
+        <span className={styles.realtimeDot} aria-hidden="true" />
+        <span>Realtime sync</span>
+        <span className={styles.realtimeState}>active</span>
+      </div>
     </aside>
   );
 }
@@ -60,7 +200,17 @@ export function DataExplorer() {
   const { table } = useParams();
   const navigate = useNavigate();
 
-  const tableNames = useMemo(() => Object.keys(schema ?? {}).sort(), [schema]);
+  const tables = useMemo<TableNavigationItem[]>(
+    () =>
+      Object.entries(schema ?? {})
+        .map(([name, tableDefinition]) => ({
+          name,
+          columnCount: tableDefinition.columns.length,
+        }))
+        .sort((left, right) => left.name.localeCompare(right.name)),
+    [schema],
+  );
+  const tableNames = useMemo(() => tables.map((entry) => entry.name), [tables]);
 
   // Land directly on the first table instead of an interstitial picker — opening
   // the explorer to an empty pane is friction every single time. The real empty
@@ -97,7 +247,7 @@ export function DataExplorer() {
             minSize={`${TABLES_SIDEBAR_MIN_SIZE}%`}
             maxSize={`${TABLES_SIDEBAR_MAX_SIZE}%`}
           >
-            <TablesSidebar tableNames={tableNames} selectedTableName={table} />
+            <TablesSidebar tables={tables} selectedTableName={table} />
           </Panel>
           <Separator className={styles.resizeHandle} />
         </>
