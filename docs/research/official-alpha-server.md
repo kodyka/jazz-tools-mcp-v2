@@ -6,6 +6,8 @@ Primary source: `garden-co/jazz`, with the user-provided reference commit:
 
 `fa7d33b3ecfc9fcb673cd7c7bb9c35d700255e1d`
 
+Cross-check source: the supplied Jazz v2 documentation snapshot, including server setup, TypeScript server setup, auth/permissions, testing, queries, durability, and the built-in MCP reference.
+
 At research time the official `packages/jazz-tools/package.json` on `main` and at that commit reports:
 
 ```text
@@ -57,6 +59,11 @@ This matters because a new MCP connector must model the behavior of the Rust ser
 
 The current command builds a `ServerBuilder`, selects persistent or in-memory storage, binds an Axum listener, and supports controlled shutdown.
 
+The prose docs distinguish secret roles:
+
+- admin secret: catalogue/deploy/migrations access and edge upstream auth
+- backend secret: backend/session impersonation and explicit server-owned backend access
+
 ## 4. Server routes
 
 `crates/jazz-tools/src/server/routes/mod.rs` constructs the HTTP router.
@@ -91,9 +98,15 @@ There is no generic REST `/rows` or SQL endpoint. Data reads/writes flow through
 2. `backend_secret` with no user JWT/session -> backend connection
 3. otherwise resolve a user session
 
-Therefore the exact self-host example containing only `--admin-secret` is sufficient for an admin-authenticated Jazz WebSocket transport.
+Therefore the exact self-host example containing only `--admin-secret` is sufficient for an admin-authenticated Jazz WebSocket transport at the reviewed implementation revision.
 
 This is why the MVP can match the command exactly.
+
+### Documentation nuance
+
+The high-level backend docs recommend `context.asBackend()` for server-connected server-owned work and associate that path with `backendSecret`. `context.db()` is described as the natural unscoped handle for embedded/local-only setups.
+
+The connector therefore prefers backend-secret mode when configured, but retains admin-only compatibility for the exact self-host command. This is a privileged implementation-supported path, not a user-scoped permissions path.
 
 ## 6. Official TypeScript backend runtime
 
@@ -117,11 +130,21 @@ The context exposes:
 - `forRequest(...)`
 - `forSession(...)`
 
-`asBackend` and attribution/session helpers require the explicit backend-secret path for server-connected scoped access. For exact admin-only self-host compatibility, the MVP uses `context.db(rawSchema)`, whose underlying transport is already authenticated with the admin secret.
+`asBackend` and attribution/session helpers require the explicit backend-secret path for server-connected scoped access. For exact admin-only self-host compatibility, the MVP uses `context.db(rawSchema)`, whose underlying transport carries the admin secret.
 
 If a backend secret is configured, the MVP uses `asBackend` or `withAttribution` instead.
 
-## 7. Raw server schema can initialize Jazz
+## 7. `jazz-napi` must be explicit on Node
+
+The supplied `docs/content/docs/install/typescript-server.mdx` says:
+
+- `jazz-napi` is the native runtime for Jazz on Node.js
+- `jazz-tools` detects it automatically at runtime
+- it must still be installed/listed as an explicit dependency
+
+The connector package therefore depends on both `jazz-tools@alpha` and `jazz-napi@alpha`.
+
+## 8. Raw server schema can initialize Jazz
 
 `packages/jazz-tools/src/schema-source.ts` defines:
 
@@ -133,7 +156,7 @@ So a raw `WasmSchema` fetched from the server can be passed to `context.db(schem
 
 This removes the need to execute arbitrary application source code inside the MCP process.
 
-## 8. Official schema-fetch API
+## 9. Official schema-fetch API
 
 `packages/jazz-tools/src/runtime/schema-fetch.ts` exposes:
 
@@ -145,13 +168,38 @@ These functions use the official app-scoped routes and `X-Jazz-Admin-Secret`.
 
 The MCP uses only the read helpers in MVP.
 
-## 9. Generic querying already exists in the official Inspector
+## 10. Generic querying already exists in the official Inspector
 
 The official Inspector's `packages/inspector/src/utility/generic-query-builder.ts` implements the public `QueryBuilder` interface dynamically from a table name and `WasmSchema`. It builds Jazz query JSON with conditions, select, order, limit, and offset.
 
 The MCP adapts this pattern instead of generating SQL.
 
-## 10. Dynamic mutation is also supported by the public runtime contracts
+The supplied query docs further confirm:
+
+- predicates are AND-combined
+- query-level OR is not supported
+- supported operators depend on column type
+- order should be deterministic before pagination
+
+The connector now validates requested operators with Jazz's public where-operator metadata.
+
+## 11. Magic columns are queryable but not writable
+
+The supplied query/permission docs define system-provided magic columns:
+
+```text
+$canRead
+$canEdit
+$canDelete
+$createdBy
+$createdAt
+$updatedBy
+$updatedAt
+```
+
+They are not stored in the structural schema. The connector therefore treats them as query-time fields only while rejecting them from mutation values. Row `id` is also not accepted as a mutation field.
+
+## 12. Dynamic mutation is supported by the public runtime contracts
 
 `packages/jazz-tools/src/runtime/db.ts` defines `TableProxy<T, Init>` as a small structural interface containing `_table`, `_schema`, and phantom row/init types.
 
@@ -163,19 +211,31 @@ Db.update(table, id, data)
 Db.delete(table, id)
 ```
 
-The MVP builds a dynamic table proxy only after validating the table and columns against the fetched server schema.
+The MVP builds a dynamic table proxy only after validating the table and writable columns against the fetched server schema.
 
-## 11. Existing official `jazz-tools mcp` is a different product
+## 13. Existing official `jazz-tools mcp` is a different product
 
-The npm wrapper routes `jazz-tools mcp` to `packages/jazz-tools/dist/mcp/server.js`.
+The npm wrapper routes `jazz-tools mcp` to the built-in documentation MCP.
 
-The current official MCP implementation is a documentation MCP. Its tools are:
+The supplied MCP reference documents these tools:
 
 - `search_docs`
 - `get_doc`
 - `list_pages`
 
-It is useful as proof that Jazz ships MCP support, but it does not connect agents to app data. This repository fills that separate use case.
+The docs are matched to the installed `jazz-tools` version. This is useful for API lookup but does not connect agents to application data. This repository fills that separate data-connector use case.
+
+## 14. Official testing utilities are the right integration harness
+
+The supplied testing docs recommend `startLocalJazzServer` and `deploy` from `jazz-tools/testing` for server-connected tests.
+
+The PR now contains an integration smoke test that uses those utilities and deliberately omits `backendSecret` from the connector configuration. It verifies admin-authenticated schema discovery plus Jazz-native insert/query/update/delete against the real installed alpha runtime.
+
+## 15. Security conclusion
+
+Because the connector uses admin/backend credentials, it is a privileged operator connector. It should not be described as enforcing end-user RLS.
+
+A future user-scoped mode should use JWT/session-scoped handles (`forRequest` / `forSession` or equivalent) and preserve Jazz's per-query authorization semantics.
 
 ## MVP conclusion
 
