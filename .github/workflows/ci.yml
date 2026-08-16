@@ -21,7 +21,7 @@ jobs:
 
   inspector:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 30
     defaults:
       run:
         working-directory: packages/inspector
@@ -36,3 +36,7 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm test
       - run: pnpm build
+      - name: Install Playwright Chromium
+        run: pnpm exec playwright install --with-deps chromium
+      - name: Run Inspector browser E2E
+        run: pnpm test:browser
