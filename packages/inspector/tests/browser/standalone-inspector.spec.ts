@@ -258,19 +258,11 @@ test.describe("data explorer page", () => {
     }
     expect(uncheckedBeforeFilter).toBeGreaterThan(0);
 
-    await page.getByRole("button", { name: "Filter" }).click();
-
-    const dialog = page.getByRole("dialog", { name: "Filter rows" });
-    await expect(dialog).toBeVisible();
-
-    await dialog.getByLabel("Column").selectOption("done");
-    await dialog.getByLabel("Value").fill("true");
-    await dialog.getByRole("button", { name: "Add where clause" }).click();
-    await dialog.getByRole("button", { name: "Close" }).click();
-
-    const filterButton = page.getByRole("button", { name: "Filter (1)" });
-    await expect(dialog).not.toBeVisible();
-    await expect(filterButton).toBeVisible();
+    const filterRegion = page.getByRole("region", { name: "Filter rows" });
+    await filterRegion.getByLabel("Column").selectOption("done");
+    await filterRegion.getByLabel("Value").fill("true");
+    await filterRegion.getByRole("button", { name: "Add where clause" }).click();
+    await expect(filterRegion.getByText("done eq true", { exact: true })).toBeVisible();
 
     const checkboxes = page.getByRole("checkbox", { name: /Toggle done for/ });
     await expect.poll(async () => await checkboxes.count(), { timeout: 15_000 }).toBeGreaterThan(0);
@@ -298,8 +290,25 @@ test.describe("data explorer page", () => {
     });
     const externalWriter = context.asBackend();
     const title = `External realtime ${Date.now()}`;
+    const params = new URLSearchParams({
+      filters: JSON.stringify([
+        {
+          id: "external-realtime-title",
+          column: "title",
+          operator: "eq",
+          value: title,
+        },
+      ]),
+    });
 
     try {
+      // Use a query whose result set is empty before the external insert. This
+      // proves live query membership changes directly and avoids pagination or
+      // sort order hiding a newly inserted row outside the current page.
+      await page.goto(`/data-explorer/todos/data?${params.toString()}`);
+      await expect(page.getByText(`title eq ${title}`, { exact: true })).toBeVisible();
+      await expect(rowByTitle(page, title)).toHaveCount(0);
+
       const created = externalWriter.insert(app.todos, { title, done: false });
       await created.wait({ tier: "global" });
 
