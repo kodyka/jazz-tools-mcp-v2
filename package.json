@@ -12,10 +12,11 @@
     "check": "tsc -p tsconfig.json --noEmit",
     "start": "node dist/index.js",
     "dev": "tsx src/index.ts",
-    "test": "npm run build && node --test dist/**/*.test.js"
+    "test": "npm run build && node --test dist/*.test.js"
   },
   "dependencies": {
     "@modelcontextprotocol/server": "^2.0.0",
+    "jazz-napi": "alpha",
     "jazz-tools": "alpha",
     "zod": "^4.3.6"
   },
