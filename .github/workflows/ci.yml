@@ -36,6 +36,8 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm test
       - run: pnpm build
+      - name: Verify standalone deployment build
+        run: pnpm build:vercel && test -f dist/index.html
       - name: Install Playwright Chromium
         run: pnpm exec playwright install --with-deps chromium
       - name: Run Inspector browser E2E
