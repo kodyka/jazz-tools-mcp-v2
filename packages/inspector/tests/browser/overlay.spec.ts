@@ -1,7 +1,6 @@
 import { execFileSync } from "node:child_process";
 import { existsSync } from "node:fs";
 import { readFile } from "node:fs/promises";
-import { createRequire } from "node:module";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { expect, test } from "@playwright/test";
@@ -9,9 +8,6 @@ import { expect, test } from "@playwright/test";
 const here = dirname(fileURLToPath(import.meta.url));
 const packageRoot = join(here, "..", "..");
 const distEmbedded = join(packageRoot, "dist-embedded");
-const require = createRequire(import.meta.url);
-const jazzToolsPackageRoot = dirname(require.resolve("jazz-tools/package.json"));
-const brokerWorkerPath = join(jazzToolsPackageRoot, "dist", "worker", "jazz-broker-worker.js");
 
 const MIME: Record<string, string> = {
   ".html": "text/html; charset=utf-8",
@@ -45,23 +41,19 @@ test.describe("inspector overlay (embedded, own worker connection end-to-end)", 
   }) => {
     const pageErrors: string[] = [];
     const consoleErrors: string[] = [];
+    const failedRequests: string[] = [];
     page.on("pageerror", (error) => pageErrors.push(error.message));
     page.on("console", (message) => {
       if (message.type() === "error") consoleErrors.push(message.text());
     });
-
-    // The host and embedded Inspector must construct their SharedWorker from the
-    // exact same URL. Serve the worker shipped by the pinned jazz-tools package
-    // at a stable URL instead of allowing Vite to expose a node_modules path
-    // whose rewriting differs across the host and embedded bundles.
-    await page.route("**/__jazz/test-broker-worker.js", async (route) => {
-      const body = await readFile(brokerWorkerPath);
-      await route.fulfill({
-        contentType: "text/javascript; charset=utf-8",
-        body,
-      });
+    page.on("requestfailed", (request) => {
+      failedRequests.push(`${request.url()} :: ${request.failure()?.errorText ?? "unknown"}`);
     });
 
+    // Embedded build assets are served by the test because they are produced in
+    // dist-embedded rather than Vite's dev module graph. The broker worker is
+    // intentionally NOT intercepted here: SharedWorker must fetch the stable
+    // URL directly from the Vite dev server middleware in vite.config.ts.
     await page.route("**/__jazz/embedded/**", async (route) => {
       const pathname = new URL(route.request().url()).pathname;
       const rel =
@@ -90,6 +82,7 @@ test.describe("inspector overlay (embedded, own worker connection end-to-end)", 
           `body=${JSON.stringify(body)}`,
           `pageErrors=${JSON.stringify(pageErrors)}`,
           `consoleErrors=${JSON.stringify(consoleErrors)}`,
+          `failedRequests=${JSON.stringify(failedRequests)}`,
         ].join("\n"),
         { cause: error },
       );
