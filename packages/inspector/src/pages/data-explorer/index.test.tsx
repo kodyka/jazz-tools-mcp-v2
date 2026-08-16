@@ -51,7 +51,7 @@ describe("DataExplorer", () => {
     expect(screen.getByLabelText("View todos data")).not.toBeNull();
     expect(screen.getByLabelText("View todos schema")).not.toBeNull();
     expect(screen.getByText("Reactive table data")).not.toBeNull();
-    expect(screen.queryByText("active", { exact: false })).toBeNull();
+    expect(screen.queryByText(/^active$/i)).toBeNull();
   });
 
   it("filters the database table navigator by name", () => {
