@@ -9,6 +9,7 @@ import { createJazzContext, type JazzContext } from "jazz-tools/backend";
 import type { ConnectorConfig } from "./config.js";
 import {
   GenericQueryBuilder,
+  assertOrderByColumns,
   assertQueryableColumns,
   assertTable,
   assertWhereInput,
@@ -121,7 +122,7 @@ export class JazzConnector {
     assertWhereInput(schema, input.table, input.where);
     if (input.select) assertQueryableColumns(schema, input.table, input.select);
     if (input.orderBy) {
-      assertQueryableColumns(
+      assertOrderByColumns(
         schema,
         input.table,
         input.orderBy.map((item) => item.column),
