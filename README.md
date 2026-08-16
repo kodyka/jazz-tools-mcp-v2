@@ -1,8 +1,20 @@
 # jazz-tools-mcp-v2
 
-MVP Model Context Protocol connector for the **official `jazz-tools@alpha server`**.
+MVP Model Context Protocol **data connector** for the official **`jazz-tools@alpha server`**.
 
 This project deliberately targets the current Jazz 2 alpha architecture. It does **not** use the old `jazz-nodejs` / CoJSON `0.9.x` APIs and it does not start a second Jazz sync server.
+
+> Jazz itself also ships `jazz-tools mcp`. That is the official **documentation MCP** (`list_pages`, `search_docs`, `get_doc`). This repository is a separate, privileged connector for application data.
+
+## Security boundary
+
+This MCP connects with Jazz admin/backend credentials and therefore operates with **privileged backend access**, not an end-user permission-scoped session.
+
+- read tools may see rows an ordinary user would not be permitted to read
+- mutation tools, when enabled, may bypass ordinary row-level user policies
+- `JAZZ_MCP_PRINCIPAL` changes write attribution only; it does not impersonate a user for permission evaluation
+
+Treat this process and its secrets like database administrator credentials. Run it only in trusted operator/agent environments. Writes remain disabled by default.
 
 ## What it connects to
 
@@ -20,7 +32,7 @@ npx jazz-tools@alpha server "$JAZZ_APP_ID" \
 
 The MCP connector talks to that process in two ways:
 
-1. HTTP catalogue endpoints are used to discover the published Jazz schema.
+1. HTTP catalogue endpoints discover the published Jazz schema.
 2. Jazz's own NAPI backend runtime connects to the app-scoped WebSocket sync endpoint for queries and mutations.
 
 There is no SQL bridge and no invented REST CRUD API.
@@ -51,10 +63,20 @@ Mutation tools, disabled by default:
     "done": false,
     "title": { "contains": "ship" }
   },
+  "select": ["title", "done", "$createdBy", "$updatedAt"],
   "orderBy": [{ "column": "title", "direction": "asc" }],
   "limit": 25
 }
 ```
+
+Where predicates are AND-combined. Query-level OR is not part of the current Jazz query API. The connector validates operators against the Jazz column type (`contains` for text, range operators for numeric/timestamp fields, etc.).
+
+Query-time Jazz magic columns supported by the connector are:
+
+- `$canRead`, `$canEdit`, `$canDelete`
+- `$createdBy`, `$createdAt`, `$updatedBy`, `$updatedAt`
+
+They are query-only system columns and cannot be passed as mutation fields. Row `id` is likewise not accepted in mutation `values`; Jazz manages row identity separately.
 
 ## Requirements
 
@@ -64,7 +86,14 @@ Mutation tools, disabled by default:
 - the server admin secret
 - at least one published schema for the app
 
-The connector follows the npm `alpha` tag for `jazz-tools`. The research snapshot for this MVP was checked against official Jazz `2.0.0-alpha.53` and repository commit `fa7d33b3ecfc9fcb673cd7c7bb9c35d700255e1d` on 2026-08-16.
+For Node backends Jazz requires `jazz-napi` as an explicit dependency. This repository therefore depends on both:
+
+```text
+jazz-tools@alpha
+jazz-napi@alpha
+```
+
+The connector follows the npm `alpha` tag for both packages. The research snapshot for this MVP was checked against official Jazz `2.0.0-alpha.53` and repository commit `fa7d33b3ecfc9fcb673cd7c7bb9c35d700255e1d` on 2026-08-16.
 
 ## Setup
 
@@ -95,7 +124,7 @@ The server uses MCP stdio. Do not write logs to stdout; stdout is reserved for M
 ```json
 {
   "mcpServers": {
-    "jazz": {
+    "jazz-data": {
       "command": "node",
       "args": ["/absolute/path/to/jazz-tools-mcp-v2/dist/index.js"],
       "env": {
@@ -107,6 +136,8 @@ The server uses MCP stdio. Do not write logs to stdout; stdout is reserved for M
   }
 }
 ```
+
+Using a name such as `jazz-data` avoids confusion with Jazz's built-in docs MCP.
 
 ## Schema discovery
 
@@ -132,13 +163,9 @@ After a new deployment, call `jazz_reload_schema` or restart the MCP process. Ja
 
 ## Authentication modes
 
-### Exact self-host example: admin secret only
+### Preferred production backend mode
 
-The official alpha server accepts an `admin_secret` in the WebSocket auth handshake as backend access. Therefore the connector works with the exact self-host command above and uses `context.db(schema)` over that admin-authenticated transport.
-
-### Optional backend secret
-
-For a more explicit backend identity, start Jazz with both secrets:
+The Jazz v2 backend documentation recommends explicit backend identity for server-connected server-owned work. Start Jazz with both secrets:
 
 ```bash
 npx jazz-tools@alpha server "$JAZZ_APP_ID" \
@@ -154,13 +181,21 @@ Then configure:
 JAZZ_BACKEND_SECRET=...
 ```
 
-The MCP uses `context.asBackend(schema)`. To stamp mutation provenance while retaining backend access:
+The MCP uses `context.asBackend(schema)`.
+
+To stamp mutation provenance while retaining backend-level permissions:
 
 ```bash
 JAZZ_MCP_PRINCIPAL=mcp:agent
 ```
 
-This uses `context.withAttribution(...)` and therefore requires `JAZZ_BACKEND_SECRET`.
+This uses `context.withAttribution(...)` and requires `JAZZ_BACKEND_SECRET`.
+
+### Compatibility mode: admin secret only
+
+The exact self-host example above contains only `--admin-secret`. The current alpha Rust server accepts `admin_secret` in its WebSocket handshake as backend access, so the connector retains an admin-only compatibility path and uses the context's admin-authenticated transport.
+
+This path is tested in CI against Jazz's official `startLocalJazzServer` + `deploy` test utilities. For production server-owned work, prefer the explicit backend-secret mode above.
 
 ## Write safety
 
@@ -184,7 +219,30 @@ JAZZ_MCP_DURABILITY=edge
 
 Allowed values are `local`, `edge`, and `global`.
 
-The MVP intentionally does **not** expose schema mutation, permission mutation, migrations, arbitrary HTTP requests, raw SQLite access, or arbitrary SQL. Those operations have stronger Jazz-specific invariants and should continue through the official `validate`, `deploy`, `permissions`, and `migrations` flows.
+The MVP intentionally does **not** expose schema mutation, permission mutation, migrations, arbitrary HTTP requests, raw SQLite access, or arbitrary SQL. Those operations have stronger Jazz-specific invariants and should continue through the official `validate`, `deploy`, permissions, and migrations flows.
+
+The current query surface also intentionally omits relation `include(...)`, recursive `gather(...)`, reactive subscriptions, and arbitrary query JSON.
+
+## Verification
+
+CI runs on Node 22.12 and performs:
+
+```text
+npm install
+npm run check
+npm test
+npm run build
+```
+
+Tests include an integration smoke test using the official Jazz testing utilities to:
+
+1. start an in-memory Jazz server
+2. deploy a real schema and permissions bundle
+3. connect this MCP adapter without passing the backend secret
+4. discover the published schema through the admin catalogue
+5. insert/query/update/delete through Jazz's native runtime and WebSocket protocol
+
+For a manual server test, see [`docs/testing.md`](docs/testing.md).
 
 ## Test with MCP Inspector
 
@@ -196,12 +254,11 @@ npx @modelcontextprotocol/inspector node ./dist/index.js
 
 Provide the Jazz environment variables in the shell that launches the Inspector.
 
-For an end-to-end server test, see [`docs/testing.md`](docs/testing.md).
-
 ## Research
 
 - [`docs/research/official-alpha-server.md`](docs/research/official-alpha-server.md)
 - [`docs/research/analogs-and-old-server.md`](docs/research/analogs-and-old-server.md)
+- [`docs/research/attached-jazz-v2-docs-review.md`](docs/research/attached-jazz-v2-docs-review.md)
 - [`docs/architecture.md`](docs/architecture.md)
 
 ## License
