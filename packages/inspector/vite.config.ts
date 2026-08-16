@@ -23,22 +23,27 @@ const require = createRequire(import.meta.url);
 const jazzToolsPackageRoot = dirname(require.resolve("jazz-tools/package.json"));
 const jazzToolsRequire = createRequire(resolve(jazzToolsPackageRoot, "package.json"));
 const jazzWasmEntry = jazzToolsRequire.resolve("jazz-wasm");
+const jazzViteAliases = jazzRuntimeConfig.resolve?.alias ?? [];
+
+/**
+ * The published package intentionally ships the dedicated worker as normal
+ * transpiled ESM, not as one self-contained browser file. Point local E2E entry
+ * modules at the package files and let Vite transform the complete dependency
+ * graph. This is different from serving dist/worker/jazz-worker.js verbatim,
+ * which leaves its ../runtime imports and dynamic jazz-wasm import unresolved.
+ */
+const testWorkerAliases = [
+  {
+    find: /^@jazz-test-worker-entry$/,
+    replacement: resolve(jazzToolsPackageRoot, "dist", "worker", "jazz-worker.js"),
+  },
+  {
+    find: /^@jazz-test-broker-worker-entry$/,
+    replacement: resolve(jazzToolsPackageRoot, "dist", "worker", "jazz-broker-worker.js"),
+  },
+];
 
 const testRuntimeFiles = new Map<string, { path: string; contentType: string }>([
-  [
-    "/__jazz/test-worker.js",
-    {
-      path: resolve(jazzToolsPackageRoot, "dist", "worker", "jazz-worker.js"),
-      contentType: "text/javascript; charset=utf-8",
-    },
-  ],
-  [
-    "/__jazz/test-broker-worker.js",
-    {
-      path: resolve(jazzToolsPackageRoot, "dist", "worker", "jazz-broker-worker.js"),
-      contentType: "text/javascript; charset=utf-8",
-    },
-  ],
   [
     "/__jazz/test-runtime.wasm",
     {
@@ -50,12 +55,9 @@ const testRuntimeFiles = new Map<string, { path: string; contentType: string }>(
 
 /**
  * Browser E2E uses a real host bundle plus the separately-built embedded
- * Inspector. Worker identity and WASM bootstrap URLs must therefore be stable
- * across both bundles.
- *
- * Playwright page routing does not reliably serve Worker/SharedWorker scripts.
- * Serve the exact runtime files from the pinned package through Vite itself so
- * the browser can fetch them as normal same-origin resources.
+ * Inspector. Both clients receive explicit worker URLs pointing at local test
+ * entry modules in Vite's normal module graph, while the WASM binary is served
+ * at one stable same-origin URL.
  */
 function inspectorBrowserTestRuntimePlugin(): Plugin {
   return {
@@ -78,10 +80,18 @@ function inspectorBrowserTestRuntimePlugin(): Plugin {
   };
 }
 
+const sharedConfig = {
+  ...jazzRuntimeConfig,
+  resolve: {
+    ...(jazzRuntimeConfig.resolve ?? {}),
+    alias: [...jazzViteAliases, ...testWorkerAliases],
+  },
+};
+
 export default defineConfig(({ mode }): UserConfig => {
   if (mode === "embedded") {
     return {
-      ...jazzRuntimeConfig,
+      ...sharedConfig,
       plugins: [inspectorBrowserTestRuntimePlugin(), react()],
       base: "./",
       build: {
@@ -94,7 +104,7 @@ export default defineConfig(({ mode }): UserConfig => {
 
   // The standalone "web" build (the default).
   return {
-    ...jazzRuntimeConfig,
+    ...sharedConfig,
     plugins: [inspectorBrowserTestRuntimePlugin(), react()],
     base: "/",
     publicDir: "public",
