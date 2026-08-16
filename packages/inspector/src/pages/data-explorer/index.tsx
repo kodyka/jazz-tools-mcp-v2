@@ -10,6 +10,8 @@ const TABLES_SIDEBAR_DEFAULT_SIZE = 16;
 const TABLES_SIDEBAR_MIN_SIZE = 10;
 const TABLES_SIDEBAR_MAX_SIZE = 30;
 
+type TableView = "data" | "schema";
+
 interface DataExplorerOutletContext {
   isTablesPanelOpen: boolean;
 }
@@ -17,6 +19,10 @@ interface DataExplorerOutletContext {
 interface TableNavigationItem {
   name: string;
   columnCount: number;
+}
+
+function tablePath(tableName: string, view: TableView): string {
+  return `/data-explorer/${encodeURIComponent(tableName)}/${view}`;
 }
 
 function isTablesSidebarSize(value: unknown): value is number {
@@ -147,7 +153,7 @@ function TablesSidebar({ tables, selectedTableName }: TablesSidebarProps) {
               <li key={table.name} className={styles.tableListItem}>
                 <div className={`${styles.tableRow} ${isSelected ? styles.tableRowActive : ""}`}>
                   <NavLink
-                    to={`/data-explorer/${table.name}/data`}
+                    to={tablePath(table.name, "data")}
                     className={styles.tableLink}
                     aria-label={`View ${table.name} data`}
                   >
@@ -163,7 +169,7 @@ function TablesSidebar({ tables, selectedTableName }: TablesSidebarProps) {
                     </span>
                   </NavLink>
                   <NavLink
-                    to={`/data-explorer/${table.name}/schema`}
+                    to={tablePath(table.name, "schema")}
                     className={({ isActive }) =>
                       `${styles.schemaLink} ${isActive ? styles.schemaLinkActive : ""}`
                     }
@@ -186,8 +192,8 @@ function TablesSidebar({ tables, selectedTableName }: TablesSidebarProps) {
 
       <div className={styles.sidebarFooter}>
         <span className={styles.realtimeDot} aria-hidden="true" />
-        <span>Realtime sync</span>
-        <span className={styles.realtimeState}>active</span>
+        <span>Reactive table data</span>
+        <span className={styles.realtimeState}>Jazz</span>
       </div>
     </aside>
   );
@@ -212,14 +218,15 @@ export function DataExplorer() {
   );
   const tableNames = useMemo(() => tables.map((entry) => entry.name), [tables]);
 
-  // Land directly on the first table instead of an interstitial picker — opening
-  // the explorer to an empty pane is friction every single time. The real empty
-  // state below is reserved for a schema with no tables at all.
+  // Keep the explorer on a valid runtime table. This also recovers cleanly after
+  // switching to a schema version that no longer contains the previously open table.
   useEffect(() => {
-    if (!table && tableNames.length > 0) {
-      navigate(`/data-explorer/${tableNames[0]}/data`, { replace: true });
+    if (tableNames.length === 0) return;
+    if (!table || !tableNames.includes(table)) {
+      navigate(tablePath(tableNames[0], "data"), { replace: true });
     }
   }, [table, tableNames, navigate]);
+
   const [tablesSidebarSize, setTablesSidebarSize] = useLocalStorageState(
     TABLES_SIDEBAR_SIZE_STORAGE_KEY,
     TABLES_SIDEBAR_DEFAULT_SIZE,
