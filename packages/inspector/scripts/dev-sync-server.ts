@@ -17,6 +17,10 @@ export default async function runServer() {
     port: TEST_PORT,
     adminSecret: ADMIN_SECRET,
     backendSecret: "test",
+    // The embedded browser fixture deliberately authenticates with
+    // useLocalFirstAuth(), so make that test-server capability explicit rather
+    // than relying on a JazzServer default that can differ across alpha builds.
+    allowLocalFirstAuth: true,
   });
 
   await deploy({
