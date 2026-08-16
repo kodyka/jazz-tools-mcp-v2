@@ -38,7 +38,9 @@ async function storeStandaloneConfig(page: Page) {
 
 async function expectTodosTableLoaded(page: Page) {
   await expect(page.getByRole("heading", { name: "Database" })).toBeVisible({ timeout: 15_000 });
-  await expect(page.getByRole("link", { name: "Schema" })).toBeVisible({ timeout: 5_000 });
+  await expect(page.getByRole("link", { name: "Schema", exact: true })).toBeVisible({
+    timeout: 5_000,
+  });
   await expect(page.getByRole("checkbox", { name: /Toggle done for/ }).first()).toBeVisible({
     timeout: 15_000,
   });
@@ -143,7 +145,7 @@ test.describe("data explorer page", () => {
   });
 
   test("loads schema explorer", async ({ page }) => {
-    await page.getByRole("link", { name: "Schema" }).click();
+    await page.getByRole("link", { name: "Schema", exact: true }).click();
 
     await expect(page.getByText('\"name\": \"title\"')).toBeVisible();
     await expect(page.getByText('\"type\": \"Text\"')).toBeVisible();
