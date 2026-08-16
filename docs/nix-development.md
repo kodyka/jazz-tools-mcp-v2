@@ -13,11 +13,12 @@ It provides:
 
 - Node.js 22
 - npm
+- pnpm
 - Git
 - curl
 - CA certificates
 
-The project itself requires Node.js 22.12 or newer.
+The root MCP project requires Node.js 22.12 or newer. The vendored Jazz Admin Inspector also requires Node.js 22.12 or newer and uses `pnpm`.
 
 ## 1. Clone the repository
 
@@ -74,47 +75,28 @@ From the repository root:
 nix develop
 ```
 
-The shell prints the active Node and npm versions and the recommended verification commands.
+The shell prints Node, npm, and pnpm versions plus the recommended verification commands.
 
 Verify manually if desired:
 
 ```bash
 node --version
 npm --version
+pnpm --version
 ```
 
-## 4. Install npm dependencies
+## 4. Test the root MCP connector
 
 Still inside the `nix develop` shell:
 
 ```bash
 npm install --no-audit --no-fund
-```
-
-This installs the project dependencies, including:
-
-- `jazz-tools@alpha`
-- `jazz-napi@alpha`
-- MCP TypeScript SDK
-- TypeScript tooling
-
-`jazz-napi` publishes a native Apple Silicon build, so the real Jazz integration test can run on an `aarch64-darwin` Mac without building Jazz from Rust source.
-
-## 5. Type-check
-
-```bash
 npm run check
-```
-
-Expected result: exit code `0` with no TypeScript errors.
-
-## 6. Run all tests
-
-```bash
 npm test
+npm run build
 ```
 
-This includes the real Jazz integration test. It automatically:
+The integration test automatically:
 
 1. starts an in-memory Jazz server through the official Jazz NAPI runtime;
 2. deploys a test schema and permissions;
@@ -130,17 +112,112 @@ Expected final test summary includes:
 fail 0
 ```
 
-## 7. Build
-
-```bash
-npm run build
-```
-
-Verify the generated entry point:
+Verify the generated MCP entry point:
 
 ```bash
 ls -la dist/index.js
 ```
+
+## 5. Test the Jazz Admin Inspector
+
+From the repository root, while still inside `nix develop`:
+
+```bash
+cd packages/inspector
+pnpm install --frozen-lockfile
+pnpm test
+pnpm build
+```
+
+The Inspector is a separate frontend package with its own `pnpm-lock.yaml`.
+
+Expected results:
+
+- Vitest unit tests pass;
+- TypeScript build passes;
+- standalone Vite build is produced;
+- embedded Inspector build is produced.
+
+## 6. Run the Jazz Admin Inspector locally
+
+```bash
+cd packages/inspector
+pnpm dev
+```
+
+Open:
+
+```text
+http://localhost:5173
+```
+
+The standalone UI asks for:
+
+```text
+serverUrl
+appId
+adminSecret
+env
+branch
+```
+
+For a local self-hosted server, `serverUrl` is normally:
+
+```text
+http://127.0.0.1:1625
+```
+
+The current admin UI work is documented in:
+
+```text
+docs/admin-inspector-mvp-plan.md
+```
+
+## 7. Full MCP + realtime Inspector demo
+
+Use three terminals.
+
+### Terminal A — server
+
+```bash
+export JAZZ_APP_ID="replace-with-your-dev-app-id"
+export JAZZ_ADMIN_SECRET="replace-with-your-dev-admin-secret"
+
+npx --yes jazz-tools@alpha server "$JAZZ_APP_ID" \
+  --port 1625 \
+  --data-dir ./data \
+  --admin-secret "$JAZZ_ADMIN_SECRET"
+```
+
+### Terminal B — Inspector
+
+```bash
+cd /path/to/jazz-tools-mcp-v2
+nix develop
+cd packages/inspector
+pnpm install --frozen-lockfile
+pnpm dev
+```
+
+Open `http://localhost:5173` and connect to the app.
+
+### Terminal C — MCP connector
+
+```bash
+cd /path/to/jazz-tools-mcp-v2
+nix develop
+npm install --no-audit --no-fund
+npm run build
+
+export JAZZ_SERVER_URL="http://127.0.0.1:1625"
+export JAZZ_APP_ID="replace-with-your-dev-app-id"
+export JAZZ_ADMIN_SECRET="replace-with-your-dev-admin-secret"
+export JAZZ_MCP_ALLOW_WRITES="true"
+
+npx --yes @modelcontextprotocol/inspector node ./dist/index.js
+```
+
+Call `jazz_insert`, `jazz_update`, and `jazz_delete` while the same table is visible in the browser. Jazz's reactive query should update the Inspector without a page refresh.
 
 ## 8. Leave the Nix shell
 
@@ -148,9 +225,7 @@ ls -la dist/index.js
 exit
 ```
 
-## Fast path
-
-After cloning and checking out the branch, the complete interactive flow is:
+## Fast path — MCP only
 
 ```bash
 nix develop
@@ -161,9 +236,20 @@ npm run build
 exit
 ```
 
-## One-command verification without staying in the shell
+## Fast path — Inspector only
 
-From the repository root you can run the entire verification through the flake in one command:
+```bash
+nix develop
+cd packages/inspector
+pnpm install --frozen-lockfile
+pnpm test
+pnpm build
+pnpm dev
+```
+
+## One-command MCP verification
+
+From the repository root:
 
 ```bash
 nix develop -c bash -lc 'npm install --no-audit --no-fund && npm run check && npm test && npm run build'
@@ -175,10 +261,12 @@ If `node_modules` already exists and you only want to run the tests:
 nix develop -c npm test
 ```
 
-Or run type-check + tests + build without reinstalling dependencies:
+## One-command Inspector verification
+
+From the repository root:
 
 ```bash
-nix develop -c bash -lc 'npm run check && npm test && npm run build'
+nix develop -c bash -lc 'cd packages/inspector && pnpm install --frozen-lockfile && pnpm test && pnpm build'
 ```
 
 ## If flakes are not enabled in your Nix installation
@@ -189,7 +277,7 @@ Most current Nix installations enable flakes, but if `nix develop` reports that 
 nix --extra-experimental-features 'nix-command flakes' develop
 ```
 
-The equivalent one-command test is:
+The equivalent one-command MCP test is:
 
 ```bash
 nix --extra-experimental-features 'nix-command flakes' develop -c bash -lc 'npm install --no-audit --no-fund && npm run check && npm test && npm run build'
@@ -213,7 +301,7 @@ nix develop
 
 ## Manual MCP Inspector test
 
-After the automated tests pass, continue with the full local MCP test guide:
+For the complete root MCP connector workflow, also see:
 
 ```text
 docs/local-testing-runbook.md
