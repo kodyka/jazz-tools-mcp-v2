@@ -230,12 +230,15 @@ test.describe("data explorer page", () => {
   });
 
   test("filters rows to done=true and shows only checked boolean cells", async ({ page }) => {
-    const firstTodo = rowByTitle(page, "First seeded todo");
-    const secondTodo = rowByTitle(page, "Second seeded todo");
-    await expect(firstTodo).toBeVisible({ timeout: 15_000 });
-    await expect(secondTodo).toBeVisible({ timeout: 15_000 });
-    await expect(firstTodo.getByRole("checkbox")).not.toBeChecked();
-    await expect(secondTodo.getByRole("checkbox")).toBeChecked();
+    // Earlier tests intentionally mutate the first two seeded rows. Use untouched
+    // deterministic fixtures here so the filter assertion is independent of test
+    // ordering while still proving both false and true values before filtering.
+    const falseTodo = rowByTitle(page, "Seeded todo 000003");
+    const trueTodo = rowByTitle(page, "Seeded todo 000004");
+    await expect(falseTodo).toBeVisible({ timeout: 15_000 });
+    await expect(trueTodo).toBeVisible({ timeout: 15_000 });
+    await expect(falseTodo.getByRole("checkbox")).not.toBeChecked();
+    await expect(trueTodo.getByRole("checkbox")).toBeChecked();
 
     const filterRegion = page.getByRole("region", { name: "Filter rows" });
     await filterRegion.getByLabel("Column", { exact: true }).selectOption("done");
@@ -243,7 +246,7 @@ test.describe("data explorer page", () => {
     await filterRegion.getByRole("button", { name: "Add where clause" }).click();
     await expect(filterRegion.getByText("done eq true", { exact: true })).toBeVisible();
 
-    await expect(firstTodo).toHaveCount(0, { timeout: 15_000 });
+    await expect(falseTodo).toHaveCount(0, { timeout: 15_000 });
     const checkboxes = page.getByRole("checkbox", { name: /Toggle done for/ });
     await expect.poll(async () => await checkboxes.count(), { timeout: 15_000 }).toBeGreaterThan(0);
     const checkboxCount = await checkboxes.count();
