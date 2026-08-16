@@ -1,8 +1,10 @@
-import type {
-  DynamicTableRow,
-  QueryBuilder,
-  TableProxy,
-  WasmSchema,
+import {
+  getSupportedWhereOperatorsForSchemaColumn,
+  type DynamicTableRow,
+  type QueryBuilder,
+  type TableProxy,
+  type WasmSchema,
+  type WhereOperator,
 } from "jazz-tools";
 
 export type GenericWhereInput = Record<string, unknown>;
@@ -11,6 +13,26 @@ export interface OrderByInput {
   column: string;
   direction?: "asc" | "desc";
 }
+
+const MAGIC_QUERY_COLUMNS = [
+  "$canRead",
+  "$canEdit",
+  "$canDelete",
+  "$createdBy",
+  "$createdAt",
+  "$updatedBy",
+  "$updatedAt",
+] as const;
+
+const MAGIC_COLUMN_OPERATORS: Record<(typeof MAGIC_QUERY_COLUMNS)[number], readonly WhereOperator[]> = {
+  $canRead: ["eq", "ne", "in"],
+  $canEdit: ["eq", "ne", "in"],
+  $canDelete: ["eq", "ne", "in"],
+  $createdBy: ["eq", "ne", "contains", "in"],
+  $createdAt: ["eq", "ne", "gt", "gte", "lt", "lte", "in"],
+  $updatedBy: ["eq", "ne", "contains", "in"],
+  $updatedAt: ["eq", "ne", "gt", "gte", "lt", "lte", "in"],
+};
 
 /**
  * Dynamic QueryBuilder adapted from the official Jazz Inspector's
@@ -119,20 +141,82 @@ export function assertTable(schema: WasmSchema, tableName: string): void {
   }
 }
 
-export function assertColumns(schema: WasmSchema, tableName: string, columns: string[]): void {
+export function assertQueryableColumns(
+  schema: WasmSchema,
+  tableName: string,
+  columns: string[],
+): void {
   assertTable(schema, tableName);
-  const allowed = new Set(["id", ...schema[tableName]!.columns.map((column) => column.name)]);
+  const allowed = new Set([
+    "id",
+    ...schema[tableName]!.columns.map((column) => column.name),
+    ...MAGIC_QUERY_COLUMNS,
+  ]);
   const unknown = columns.filter((column) => !allowed.has(column));
   if (unknown.length > 0) {
-    throw new Error(`Unknown column(s) on ${tableName}: ${unknown.join(", ")}`);
+    throw new Error(`Unknown query column(s) on ${tableName}: ${unknown.join(", ")}`);
   }
 }
 
-export function assertWhereColumns(
+export function assertWritableColumns(
+  schema: WasmSchema,
+  tableName: string,
+  columns: string[],
+): void {
+  assertTable(schema, tableName);
+  const allowed = new Set(schema[tableName]!.columns.map((column) => column.name));
+  const invalid = columns.filter((column) => !allowed.has(column));
+  if (invalid.length > 0) {
+    throw new Error(
+      `Unknown or non-writable column(s) on ${tableName}: ${invalid.join(", ")}`,
+    );
+  }
+}
+
+export function assertWhereInput(
   schema: WasmSchema,
   tableName: string,
   where: GenericWhereInput | undefined,
 ): void {
   if (!where) return;
-  assertColumns(schema, tableName, Object.keys(where));
+  assertQueryableColumns(schema, tableName, Object.keys(where));
+
+  for (const [fieldName, value] of Object.entries(where)) {
+    if (value === undefined) continue;
+    const supported = supportedWhereOperators(schema, tableName, fieldName);
+    if (!supported) {
+      throw new Error(`Column ${tableName}.${fieldName} does not support where predicates`);
+    }
+
+    const requestedOperators =
+      typeof value === "object" &&
+      value !== null &&
+      !Array.isArray(value) &&
+      Object.getPrototypeOf(value) === Object.prototype
+        ? Object.keys(value as Record<string, unknown>)
+        : ["eq"];
+
+    const invalid = requestedOperators.filter(
+      (operator) => !supported.includes(operator as WhereOperator),
+    );
+    if (invalid.length > 0) {
+      throw new Error(
+        `Unsupported where operator(s) for ${tableName}.${fieldName}: ${invalid.join(", ")}. ` +
+          `Supported: ${supported.join(", ")}`,
+      );
+    }
+  }
+}
+
+function supportedWhereOperators(
+  schema: WasmSchema,
+  tableName: string,
+  fieldName: string,
+): readonly WhereOperator[] | undefined {
+  if (fieldName in MAGIC_COLUMN_OPERATORS) {
+    return MAGIC_COLUMN_OPERATORS[fieldName as keyof typeof MAGIC_COLUMN_OPERATORS];
+  }
+
+  const column = schema[tableName]!.columns.find((item) => item.name === fieldName);
+  return getSupportedWhereOperatorsForSchemaColumn(fieldName, column);
 }
