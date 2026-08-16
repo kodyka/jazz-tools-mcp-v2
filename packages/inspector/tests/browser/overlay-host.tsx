@@ -17,8 +17,8 @@ const TEST_ENV = "dev";
 const TEST_BRANCH = "main";
 const TEST_PORT = 19879;
 const SERVER_URL = `http://127.0.0.1:${TEST_PORT}`;
-const TEST_WORKER_URL = "/__jazz/test-worker.js";
-const TEST_BROKER_WORKER_URL = "/__jazz/test-broker-worker.js";
+const TEST_WORKER_URL = "/tests/browser/jazz-test-worker.ts";
+const TEST_BROKER_WORKER_URL = "/tests/browser/jazz-test-broker-worker.ts";
 const TEST_WASM_URL = "/__jazz/test-runtime.wasm";
 
 function HostInner() {
@@ -63,11 +63,10 @@ function HostApp() {
     userBranch: TEST_BRANCH,
     serverUrl: SERVER_URL,
     secret,
-    // The extracted Inspector consumes the published jazz-tools package. Give
-    // the host explicit, same-origin runtime URLs served by the Vite browser
-    // fixture. installInspectorHost forwards these exact values to the embedded
-    // Inspector, so the host and iframe share Worker/SharedWorker identity and
-    // use the same WASM binary rather than depending on bundle-relative paths.
+    // Keep the Worker and SharedWorker on explicit same-origin Vite module URLs.
+    // These tiny entry modules import the pinned jazz-tools worker files through
+    // aliases in vite.config.ts, allowing Vite to transform their complete ESM
+    // dependency graphs instead of serving one raw dist file.
     runtimeSources: {
       workerUrl: new URL(TEST_WORKER_URL, origin).href,
       brokerWorkerUrl: new URL(TEST_BROKER_WORKER_URL, origin).href,
