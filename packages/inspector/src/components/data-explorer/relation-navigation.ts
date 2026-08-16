@@ -4,5 +4,5 @@ export function buildRelationFilterHref(table: string, id: string): string {
     "filters",
     JSON.stringify([{ id: `relation-id-${id}`, column: "id", operator: "eq", value: id }]),
   );
-  return `/data-explorer/${table}/data?${params.toString()}`;
+  return `/data-explorer/${encodeURIComponent(table)}/data?${params.toString()}`;
 }
