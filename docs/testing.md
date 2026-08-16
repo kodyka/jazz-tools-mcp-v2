@@ -1,5 +1,7 @@
 # End-to-end test runbook
 
+> **Testing this on your own computer?** Start with [`local-testing-runbook.md`](./local-testing-runbook.md). It contains copy/paste commands for cloning the repo, installing Node dependencies, running the self-contained real-Jazz integration test, starting a local Jazz server, deploying a schema, launching MCP Inspector, and manually testing read/write tools on macOS/Linux/Git Bash and Windows PowerShell.
+
 This runbook targets the official alpha server rather than a mock REST API.
 
 ## Automated CI smoke test
