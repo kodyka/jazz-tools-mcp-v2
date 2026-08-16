@@ -2,6 +2,22 @@
 
 Research date: 2026-08-16
 
+## Official Jazz docs MCP: same protocol, different purpose
+
+The current `jazz-tools` package already ships an MCP server via `jazz-tools mcp`.
+
+Official documentation: `docs/content/docs/reference/mcp.mdx`.
+
+Its tools are:
+
+- `list_pages`
+- `search_docs`
+- `get_doc`
+
+The docs MCP intentionally serves documentation matched to the installed Jazz package version. It does not connect to an application's tables or expose database reads/writes.
+
+This is important naming/product context: `jazz-tools-mcp-v2` is a **Jazz data connector**, not a replacement for the official docs MCP. An MCP host can use both at once (for example `jazz-docs` and `jazz-data`).
+
 ## Old reference: `bensleveritt/jazz-mcp-server`
 
 Repository:
@@ -40,13 +56,13 @@ Only generic organization ideas survive:
 
 No Jazz API calls from that repository are copied into this MVP.
 
-## Official Jazz Inspector: strongest direct analog
+## Official Jazz Inspector: strongest direct data analog
 
 Source:
 
 https://github.com/garden-co/jazz/tree/main/packages/inspector
 
-The Inspector is the most relevant implementation reference because it uses the same current `jazz-tools` types while operating on schemas/tables selected dynamically at runtime.
+The Inspector is the most relevant data-access implementation reference because it uses the same current `jazz-tools` types while operating on schemas/tables selected dynamically at runtime.
 
 Relevant code:
 
@@ -104,8 +120,10 @@ The guidance explicitly reserves stdout for JSON-RPC and recommends stderr for o
 
 Priority order used for this repository:
 
-1. current official `garden-co/jazz` alpha server/runtime code
+1. current official Jazz v2 docs and `garden-co/jazz` alpha server/runtime code
 2. current official Jazz Inspector dynamic data-access patterns
 3. current MCP TypeScript SDK conventions
-4. LiveStore/RxDB for high-level MCP ergonomics
+4. LiveStore/RxDB for high-level data-MCP ergonomics
 5. old `bensleveritt/jazz-mcp-server` only as historical context
+
+The official Jazz docs MCP is not an implementation analog for database access, but it is authoritative for MCP naming/runtime expectations and can coexist with this connector.
