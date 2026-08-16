@@ -18,3 +18,21 @@ jobs:
       - run: npm run check
       - run: npm test
       - run: npm run build
+
+  inspector:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: packages/inspector
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '22.12.0'
+      - name: Install pnpm
+        run: npm install --global pnpm@10
+        working-directory: .
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm test
+      - run: pnpm build
