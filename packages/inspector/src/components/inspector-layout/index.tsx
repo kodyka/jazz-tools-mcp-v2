@@ -186,11 +186,10 @@ export function InspectorLayout() {
           {connection ? (
             <div
               className={styles.liveConnection}
-              aria-label="Live Jazz connection"
+              aria-label="Jazz connection configuration"
               title={`${serverHost(connection.serverUrl)} · ${connection.appId}`}
             >
-              <span className={styles.liveDot} aria-hidden="true" />
-              <span className={styles.liveLabel}>Live</span>
+              <span className={styles.liveLabel}>Jazz</span>
               <span className={styles.connectionApp}>{shortAppId(connection.appId)}</span>
             </div>
           ) : null}
