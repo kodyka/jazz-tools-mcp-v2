@@ -140,7 +140,6 @@ test.describe("data explorer page", () => {
 
   test("loads data explorer from stored config", async ({ page }) => {
     await page.getByRole("link", { name: "View todos data" }).click();
-
     await expect(page.getByText("First seeded todo")).toBeVisible();
   });
 
@@ -160,9 +159,7 @@ test.describe("data explorer page", () => {
   test("opens inline text editor in selected row", async ({ page }) => {
     const title = "First seeded todo";
     const titleCell = page.getByRole("gridcell", { name: title, exact: true });
-
     await titleCell.dblclick();
-
     await expect(page.getByLabel("Edit title")).toBeVisible();
   });
 
@@ -171,7 +168,6 @@ test.describe("data explorer page", () => {
     const updatedTitle = `Discarded inline edit ${Date.now()}`;
 
     await page.getByRole("gridcell", { name: originalTitle, exact: true }).dblclick();
-
     const editor = page.getByLabel("Edit title");
     await editor.fill(updatedTitle);
     await editor.press("Enter");
@@ -182,7 +178,6 @@ test.describe("data explorer page", () => {
     await expect(page.getByRole("gridcell", { name: updatedTitle, exact: true })).toBeVisible();
 
     await page.getByRole("button", { name: "Discard" }).click();
-
     await expect(page.getByRole("button", { name: "Discard" })).toHaveCount(0);
     await expect(page.getByRole("button", { name: "Save changes" })).toHaveCount(0);
     await expect(page.getByRole("gridcell", { name: originalTitle, exact: true })).toBeVisible();
@@ -198,7 +193,6 @@ test.describe("data explorer page", () => {
     const updatedTitle = `Edited ${Date.now()}`;
 
     await page.getByRole("gridcell", { name: originalTitle, exact: true }).dblclick();
-
     const editor = page.getByLabel("Edit title");
     await editor.fill(updatedTitle);
     await editor.press("Enter");
@@ -206,7 +200,6 @@ test.describe("data explorer page", () => {
     const queuedBanner = page.getByRole("status");
     await expect(queuedBanner).toContainText("Queued");
     await expect(queuedBanner).toContainText("1 edit across 1 row");
-
     await page.getByRole("button", { name: "Save changes" }).click();
     await expect(page.getByRole("button", { name: "Save changes" })).toHaveCount(0);
 
@@ -221,14 +214,12 @@ test.describe("data explorer page", () => {
     const title = "Second seeded todo";
     const targetRow = rowByTitle(page, title);
     const toggle = targetRow.getByRole("checkbox");
-
     const initialChecked = await toggle.isChecked();
     await toggle.click();
 
     const queuedBanner = page.getByRole("status");
     await expect(queuedBanner).toContainText("Queued");
     await expect(queuedBanner).toContainText("1 edit across 1 row");
-
     await page.getByRole("button", { name: "Save changes" }).click();
     await expect(page.getByRole("button", { name: "Save changes" })).toHaveCount(0);
 
@@ -236,9 +227,7 @@ test.describe("data explorer page", () => {
     await expect(rowByTitle(page, title).getByRole("checkbox")).toHaveJSProperty(
       "checked",
       !initialChecked,
-      {
-        timeout: 15_000,
-      },
+      { timeout: 15_000 },
     );
   });
 
@@ -252,15 +241,13 @@ test.describe("data explorer page", () => {
 
     let uncheckedBeforeFilter = 0;
     for (let index = 0; index < visibleCheckboxCountBeforeFilter; index += 1) {
-      if (!(await visibleCheckboxesBeforeFilter.nth(index).isChecked())) {
-        uncheckedBeforeFilter += 1;
-      }
+      if (!(await visibleCheckboxesBeforeFilter.nth(index).isChecked())) uncheckedBeforeFilter += 1;
     }
     expect(uncheckedBeforeFilter).toBeGreaterThan(0);
 
     const filterRegion = page.getByRole("region", { name: "Filter rows" });
-    await filterRegion.getByLabel("Column").selectOption("done");
-    await filterRegion.getByLabel("Value").fill("true");
+    await filterRegion.getByLabel("Column", { exact: true }).selectOption("done");
+    await filterRegion.getByLabel("Value", { exact: true }).fill("true");
     await filterRegion.getByRole("button", { name: "Add where clause" }).click();
     await expect(filterRegion.getByText("done eq true", { exact: true })).toBeVisible();
 
@@ -268,7 +255,6 @@ test.describe("data explorer page", () => {
     await expect.poll(async () => await checkboxes.count(), { timeout: 15_000 }).toBeGreaterThan(0);
     const checkboxCount = await checkboxes.count();
     expect(checkboxCount).toBeGreaterThan(0);
-
     for (let index = 0; index < checkboxCount; index += 1) {
       await expect(checkboxes.nth(index)).toBeChecked();
     }
@@ -292,34 +278,27 @@ test.describe("data explorer page", () => {
     const title = `External realtime ${Date.now()}`;
     const params = new URLSearchParams({
       filters: JSON.stringify([
-        {
-          id: "external-realtime-title",
-          column: "title",
-          operator: "eq",
-          value: title,
-        },
+        { id: "external-realtime-title", column: "title", operator: "eq", value: title },
       ]),
     });
 
     try {
-      // Use a query whose result set is empty before the external insert. This
-      // proves live query membership changes directly and avoids pagination or
-      // sort order hiding a newly inserted row outside the current page.
       await page.goto(`/data-explorer/todos/data?${params.toString()}`);
       await expect(page.getByText(`title eq ${title}`, { exact: true })).toBeVisible();
       await expect(rowByTitle(page, title)).toHaveCount(0);
 
       const created = externalWriter.insert(app.todos, { title, done: false });
       await created.wait({ tier: "global" });
+      const createdRow = created.value;
 
       const externalRow = rowByTitle(page, title);
       await expect(externalRow).toBeVisible({ timeout: 15_000 });
       await expect(externalRow.getByRole("checkbox")).not.toBeChecked();
 
-      await externalWriter.update(app.todos, created.id, { done: true }).wait({ tier: "global" });
+      await externalWriter.update(app.todos, createdRow.id, { done: true }).wait({ tier: "global" });
       await expect(externalRow.getByRole("checkbox")).toBeChecked({ timeout: 15_000 });
 
-      await externalWriter.delete(app.todos, created.id).wait({ tier: "global" });
+      await externalWriter.delete(app.todos, createdRow.id).wait({ tier: "global" });
       await expect(externalRow).toHaveCount(0, { timeout: 15_000 });
     } finally {
       await context.shutdown();
