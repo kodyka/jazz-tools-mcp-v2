@@ -769,9 +769,10 @@ export function TableDataGrid() {
     [runtime],
   );
   const queryResult = useAll<DynamicTableRow>(queryBuilder, queryOptions);
-  // show a grid skeleton while the first result is in flight.
-  const isInitialLoading = queryResult.isLoading;
-  const rows = queryResult.data ?? EMPTY_ROWS;
+  // Published jazz-tools@alpha returns undefined until the first response,
+  // then the row array directly. Keep the loading skeleton tied to that state.
+  const isInitialLoading = queryResult === undefined;
+  const rows = queryResult ?? EMPTY_ROWS;
 
   const allGridColumns = useMemo<GridColumn[]>(
     () => [
@@ -1569,7 +1570,7 @@ function RelationCell({
     () => new GenericQueryBuilder(relationTable, schema).where({ id: relationId }).limit(1),
     [relationId, relationTable, schema],
   );
-  const { data: relationRows = EMPTY_ROWS } = useAll<DynamicTableRow>(queryBuilder, queryOptions);
+  const relationRows = useAll<DynamicTableRow>(queryBuilder, queryOptions) ?? EMPTY_ROWS;
   const relationRow = relationRows[0];
   const displayColumn = useMemo(
     () => getRelationDisplayColumn(schema, relationTable),
