@@ -769,10 +769,13 @@ export function TableDataGrid() {
     [runtime],
   );
   const queryResult = useAll<DynamicTableRow>(queryBuilder, queryOptions);
-  // Published jazz-tools@alpha returns undefined until the first response,
-  // then the row array directly. Keep the loading skeleton tied to that state.
-  const isInitialLoading = queryResult === undefined;
-  const rows = queryResult ?? EMPTY_ROWS;
+  const legacyQueryResult = queryResult as unknown as
+    | { data?: DynamicTableRow[]; isLoading?: boolean }
+    | undefined;
+  const rows = Array.isArray(queryResult) ? queryResult : (legacyQueryResult?.data ?? EMPTY_ROWS);
+  const isInitialLoading =
+    queryResult === undefined ||
+    (!Array.isArray(queryResult) && (legacyQueryResult?.isLoading ?? legacyQueryResult?.data === undefined));
 
   const allGridColumns = useMemo<GridColumn[]>(
     () => [
@@ -1570,7 +1573,11 @@ function RelationCell({
     () => new GenericQueryBuilder(relationTable, schema).where({ id: relationId }).limit(1),
     [relationId, relationTable, schema],
   );
-  const relationRows = useAll<DynamicTableRow>(queryBuilder, queryOptions) ?? EMPTY_ROWS;
+  const relationQueryResult = useAll<DynamicTableRow>(queryBuilder, queryOptions);
+  const legacyRelationResult = relationQueryResult as unknown as { data?: DynamicTableRow[] } | undefined;
+  const relationRows = Array.isArray(relationQueryResult)
+    ? relationQueryResult
+    : (legacyRelationResult?.data ?? EMPTY_ROWS);
   const relationRow = relationRows[0];
   const displayColumn = useMemo(
     () => getRelationDisplayColumn(schema, relationTable),
