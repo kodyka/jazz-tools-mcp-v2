@@ -1,4 +1,4 @@
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { MemoryRouter, Route, Routes } from "react-router";
 import { DataExplorer } from "./index";
@@ -20,8 +20,8 @@ describe("DataExplorer", () => {
     mockUseDevtoolsContext.mockReset();
     mockUseDevtoolsContext.mockReturnValue({
       wasmSchema: {
-        todos: { columns: [] },
-        users: { columns: [] },
+        todos: { columns: [{ name: "title" }, { name: "done" }] },
+        users: { columns: [{ name: "name" }] },
       },
       runtime: "extension",
       queryPropagation: "local-only",
@@ -42,5 +42,32 @@ describe("DataExplorer", () => {
 
     expect(screen.getAllByRole("separator")).toHaveLength(1);
     expect(screen.getByText("table content")).not.toBeNull();
+    expect(screen.getByText("2 tables")).not.toBeNull();
+    expect(screen.getByLabelText("View todos data")).not.toBeNull();
+    expect(screen.getByLabelText("View todos schema")).not.toBeNull();
+  });
+
+  it("filters the database table navigator by name", () => {
+    render(
+      <MemoryRouter initialEntries={["/data-explorer/todos/data"]}>
+        <Routes>
+          <Route path="/data-explorer/:table/*" element={<DataExplorer />}>
+            <Route path="data" element={<div>table content</div>} />
+          </Route>
+        </Routes>
+      </MemoryRouter>,
+    );
+
+    fireEvent.change(screen.getByLabelText("Search tables"), {
+      target: { value: "users" },
+    });
+
+    expect(screen.getByLabelText("View users data")).not.toBeNull();
+    expect(screen.queryByLabelText("View todos data")).toBeNull();
+
+    fireEvent.click(screen.getByLabelText("Clear table search"));
+
+    expect(screen.getByLabelText("View todos data")).not.toBeNull();
+    expect(screen.getByLabelText("View users data")).not.toBeNull();
   });
 });
