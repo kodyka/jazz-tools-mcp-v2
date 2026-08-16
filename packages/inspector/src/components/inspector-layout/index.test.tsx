@@ -54,6 +54,32 @@ describe("InspectorLayout", () => {
     expect(screen.getByRole("link", { name: "Subscriptions" })).not.toBeNull();
   });
 
+  it("shows configured Jazz identity without claiming unobserved live health", () => {
+    mockUseStandaloneContext.mockReturnValue({
+      onManageConnections: vi.fn(),
+      schemaHashes: [{ hash: "hash-a", publishedAt: null }],
+      selectedSchemaHash: "hash-a",
+      onSelectSchema: vi.fn(),
+      isSwitchingSchema: false,
+      connection: {
+        serverUrl: "https://example.test",
+        appId: "00000000-0000-0000-0000-000000000099",
+        adminSecret: "not-rendered",
+      },
+    });
+
+    render(
+      <MemoryRouter initialEntries={["/data-explorer/todos/data"]}>
+        <InspectorLayout />
+      </MemoryRouter>,
+    );
+
+    expect(screen.getByLabelText("Jazz connection configuration")).not.toBeNull();
+    expect(screen.getByText("Jazz", { exact: true })).not.toBeNull();
+    expect(screen.queryByText(/^live$/i)).toBeNull();
+    expect(screen.queryByText("not-rendered")).toBeNull();
+  });
+
   it("shortens schema hashes and includes upload time when available", () => {
     mockUseStandaloneContext.mockReturnValue({
       onManageConnections: vi.fn(),
