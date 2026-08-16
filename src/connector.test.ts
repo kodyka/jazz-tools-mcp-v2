@@ -1,7 +1,13 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { pickLatestSchemaHash } from "./connector.js";
-import { GenericQueryBuilder, dynamicTableProxy } from "./query.js";
+import {
+  GenericQueryBuilder,
+  assertQueryableColumns,
+  assertWhereInput,
+  assertWritableColumns,
+  dynamicTableProxy,
+} from "./query.js";
 import type { WasmSchema } from "jazz-tools";
 
 const schema = {
@@ -9,6 +15,7 @@ const schema = {
     columns: [
       { name: "title", column_type: { type: "Text" }, nullable: false },
       { name: "done", column_type: { type: "Boolean" }, nullable: false },
+      { name: "priority", column_type: { type: "Integer" }, nullable: false },
     ],
   },
 } as unknown as WasmSchema;
@@ -60,4 +67,35 @@ test("dynamicTableProxy implements Jazz mutation proxy shape", () => {
   const proxy = dynamicTableProxy("todos", schema);
   assert.equal(proxy._table, "todos");
   assert.equal(proxy._schema, schema);
+});
+
+test("query validation accepts Jazz magic columns", () => {
+  assert.doesNotThrow(() =>
+    assertQueryableColumns(schema, "todos", ["id", "$createdBy", "$updatedAt"]),
+  );
+  assert.doesNotThrow(() =>
+    assertWhereInput(schema, "todos", {
+      $createdBy: { contains: "agent" },
+      $updatedAt: { gte: 0 },
+    }),
+  );
+});
+
+test("where validation rejects operators not supported by the column type", () => {
+  assert.throws(
+    () => assertWhereInput(schema, "todos", { done: { contains: true } }),
+    /Unsupported where operator/,
+  );
+  assert.doesNotThrow(() =>
+    assertWhereInput(schema, "todos", { priority: { gte: 2, lt: 10 } }),
+  );
+});
+
+test("mutation validation rejects id and magic columns", () => {
+  assert.doesNotThrow(() => assertWritableColumns(schema, "todos", ["title", "done"]));
+  assert.throws(() => assertWritableColumns(schema, "todos", ["id"]), /non-writable/);
+  assert.throws(
+    () => assertWritableColumns(schema, "todos", ["$createdBy"]),
+    /non-writable/,
+  );
 });
