@@ -158,6 +158,28 @@ export function assertQueryableColumns(
   }
 }
 
+export function assertOrderByColumns(
+  schema: WasmSchema,
+  tableName: string,
+  columns: string[],
+): void {
+  assertQueryableColumns(schema, tableName, columns);
+
+  const unsupported = columns.filter((columnName) => {
+    if (columnName === "id" || MAGIC_QUERY_COLUMNS.includes(columnName as never)) {
+      return false;
+    }
+    const column = schema[tableName]!.columns.find((item) => item.name === columnName);
+    return column?.column_type.type === "Bytea" || column?.column_type.type === "Json";
+  });
+
+  if (unsupported.length > 0) {
+    throw new Error(
+      `Jazz orderBy does not support Bytea/Json column(s) on ${tableName}: ${unsupported.join(", ")}`,
+    );
+  }
+}
+
 export function assertWritableColumns(
   schema: WasmSchema,
   tableName: string,
