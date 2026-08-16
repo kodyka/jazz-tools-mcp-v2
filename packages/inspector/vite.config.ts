@@ -21,37 +21,59 @@ const jazzRuntimeConfig = buildJazzViteConfig({});
 
 const require = createRequire(import.meta.url);
 const jazzToolsPackageRoot = dirname(require.resolve("jazz-tools/package.json"));
-const testBrokerWorkerPath = resolve(
-  jazzToolsPackageRoot,
-  "dist",
-  "worker",
-  "jazz-broker-worker.js",
-);
+const jazzToolsRequire = createRequire(resolve(jazzToolsPackageRoot, "package.json"));
+const jazzWasmEntry = jazzToolsRequire.resolve("jazz-wasm");
+
+const testRuntimeFiles = new Map<string, { path: string; contentType: string }>([
+  [
+    "/__jazz/test-worker.js",
+    {
+      path: resolve(jazzToolsPackageRoot, "dist", "worker", "jazz-worker.js"),
+      contentType: "text/javascript; charset=utf-8",
+    },
+  ],
+  [
+    "/__jazz/test-broker-worker.js",
+    {
+      path: resolve(jazzToolsPackageRoot, "dist", "worker", "jazz-broker-worker.js"),
+      contentType: "text/javascript; charset=utf-8",
+    },
+  ],
+  [
+    "/__jazz/test-runtime.wasm",
+    {
+      path: resolve(dirname(jazzWasmEntry), "jazz_wasm_bg.wasm"),
+      contentType: "application/wasm",
+    },
+  ],
+]);
 
 /**
  * Browser E2E uses a real host bundle plus the separately-built embedded
- * Inspector. A SharedWorker is identified by its exact script URL and name, so
- * both bundles need one stable URL that the browser itself can fetch.
+ * Inspector. Worker identity and WASM bootstrap URLs must therefore be stable
+ * across both bundles.
  *
- * Playwright page routing is not a reliable way to serve SharedWorker scripts.
- * Serving the pinned jazz-tools broker worker from the Vite dev server keeps
- * the test on the same origin and makes host/iframe broker identity deterministic.
+ * Playwright page routing does not reliably serve Worker/SharedWorker scripts.
+ * Serve the exact runtime files from the pinned package through Vite itself so
+ * the browser can fetch them as normal same-origin resources.
  */
 function inspectorBrowserTestRuntimePlugin(): Plugin {
   return {
     name: "inspector-browser-test-runtime",
     apply: "serve",
     configureServer(server) {
-      server.middlewares.use("/__jazz/test-broker-worker.js", (_request, response, next) => {
-        try {
-          response.statusCode = 200;
-          response.setHeader("Content-Type", "text/javascript; charset=utf-8");
-          response.setHeader("Cache-Control", "no-store");
-          response.end(readFileSync(testBrokerWorkerPath));
-        } catch (error) {
-          next(error as Error);
-        }
-      });
+      for (const [urlPath, file] of testRuntimeFiles) {
+        server.middlewares.use(urlPath, (_request, response, next) => {
+          try {
+            response.statusCode = 200;
+            response.setHeader("Content-Type", file.contentType);
+            response.setHeader("Cache-Control", "no-store");
+            response.end(readFileSync(file.path));
+          } catch (error) {
+            next(error as Error);
+          }
+        });
+      }
     },
   };
 }
