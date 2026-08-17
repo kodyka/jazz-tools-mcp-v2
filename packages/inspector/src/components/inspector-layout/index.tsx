@@ -36,6 +36,24 @@ function TablesPanelIcon({ direction }: TablesPanelIconProps) {
   );
 }
 
+function DatabaseIcon() {
+  return (
+    <svg
+      width="17"
+      height="17"
+      viewBox="0 0 18 18"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.35"
+      aria-hidden="true"
+    >
+      <ellipse cx="9" cy="4.25" rx="5.5" ry="2.25" />
+      <path d="M3.5 4.25v4.5C3.5 10 6 11 9 11s5.5-1 5.5-2.25v-4.5" />
+      <path d="M3.5 8.75v4.5C3.5 14.5 6 15.5 9 15.5s5.5-1 5.5-2.25v-4.5" />
+    </svg>
+  );
+}
+
 function CloseIcon() {
   return (
     <svg
@@ -53,6 +71,30 @@ function CloseIcon() {
   );
 }
 
+function activeTableFromPathname(pathname: string): string | null {
+  const [section, table] = pathname.split("/").filter(Boolean);
+  if (section !== "data-explorer" || !table) return null;
+
+  try {
+    return decodeURIComponent(table);
+  } catch {
+    return table;
+  }
+}
+
+function serverHost(serverUrl: string): string {
+  try {
+    return new URL(serverUrl).host;
+  } catch {
+    return serverUrl;
+  }
+}
+
+function shortAppId(appId: string): string {
+  if (appId.length <= 18) return appId;
+  return `${appId.slice(0, 8)}…${appId.slice(-6)}`;
+}
+
 export function InspectorLayout() {
   const { runtime } = useDevtoolsContext();
   const isOverlay = runtime === "overlay";
@@ -64,6 +106,8 @@ export function InspectorLayout() {
   );
 
   const isDataExplorerRoute = location.pathname.startsWith("/data-explorer");
+  const activeTable = activeTableFromPathname(location.pathname);
+  const connection = standaloneContext?.connection;
 
   const onToggleTablesPanel = () => {
     setIsTablesPanelOpen((isOpen) => !isOpen);
@@ -72,46 +116,84 @@ export function InspectorLayout() {
   return (
     <main className={styles.root}>
       <header className={styles.topBar}>
-        <nav className={styles.tabBar} aria-label="Inspector sections">
-          {isDataExplorerRoute ? (
-            <button
-              type="button"
-              onClick={onToggleTablesPanel}
-              className={styles.iconButton}
-              aria-label={isTablesPanelOpen ? "Collapse tables panel" : "Expand tables panel"}
-              aria-pressed={isTablesPanelOpen}
-            >
-              <TablesPanelIcon direction={isTablesPanelOpen ? "close" : "open"} />
-            </button>
-          ) : null}
-          <NavLink
-            to="/data-explorer"
-            className={({ isActive }) =>
-              `${styles.tabLink} ${isActive ? styles.tabLinkActive : ""}`
-            }
-          >
-            Data Explorer
-          </NavLink>
-          <NavLink
-            to="/live-query"
-            className={({ isActive }) =>
-              `${styles.tabLink} ${isActive ? styles.tabLinkActive : ""}`
-            }
-          >
-            Subscriptions
-          </NavLink>
-          {isOverlay ? (
-            <NavLink
-              to="/settings"
-              className={({ isActive }) =>
-                `${styles.tabLink} ${isActive ? styles.tabLinkActive : ""}`
-              }
-            >
-              Settings
-            </NavLink>
-          ) : null}
-        </nav>
+        <div className={styles.topBarPrimary}>
+          <div className={styles.brand} aria-label="Jazz Admin">
+            <span className={styles.brandIcon}>
+              <DatabaseIcon />
+            </span>
+            <span className={styles.brandCopy}>
+              <strong className={styles.brandTitle}>Jazz Admin</strong>
+              <span className={styles.brandSubtitle}>{isOverlay ? "Dev overlay" : "Database console"}</span>
+            </span>
+          </div>
+
+          <div className={styles.topBarDivider} aria-hidden="true" />
+
+          <div className={styles.locationGroup}>
+            <div className={styles.breadcrumbs} aria-label="Current database location">
+              <span className={styles.breadcrumbMuted}>Database</span>
+              {activeTable ? (
+                <>
+                  <span className={styles.breadcrumbSeparator}>/</span>
+                  <strong className={styles.breadcrumbCurrent}>{activeTable}</strong>
+                </>
+              ) : null}
+            </div>
+
+            <nav className={styles.tabBar} aria-label="Inspector sections">
+              {isDataExplorerRoute ? (
+                <button
+                  type="button"
+                  onClick={onToggleTablesPanel}
+                  className={styles.iconButton}
+                  aria-label={isTablesPanelOpen ? "Collapse tables panel" : "Expand tables panel"}
+                  aria-pressed={isTablesPanelOpen}
+                >
+                  <TablesPanelIcon direction={isTablesPanelOpen ? "close" : "open"} />
+                </button>
+              ) : null}
+              <NavLink
+                to="/data-explorer"
+                className={({ isActive }) =>
+                  `${styles.tabLink} ${isActive ? styles.tabLinkActive : ""}`
+                }
+              >
+                Data Explorer
+              </NavLink>
+              <NavLink
+                to="/live-query"
+                className={({ isActive }) =>
+                  `${styles.tabLink} ${isActive ? styles.tabLinkActive : ""}`
+                }
+              >
+                Subscriptions
+              </NavLink>
+              {isOverlay ? (
+                <NavLink
+                  to="/settings"
+                  className={({ isActive }) =>
+                    `${styles.tabLink} ${isActive ? styles.tabLinkActive : ""}`
+                  }
+                >
+                  Settings
+                </NavLink>
+              ) : null}
+            </nav>
+          </div>
+        </div>
+
         <div className={styles.topBarActions}>
+          {connection ? (
+            <div
+              className={styles.liveConnection}
+              aria-label="Jazz connection configuration"
+              title={`${serverHost(connection.serverUrl)} · ${connection.appId}`}
+            >
+              <span className={styles.liveLabel}>Jazz</span>
+              <span className={styles.connectionApp}>{shortAppId(connection.appId)}</span>
+            </div>
+          ) : null}
+
           {standaloneContext ? (
             <>
               <SchemaHashesSelect
@@ -165,7 +247,7 @@ export function SchemaHashesSelect({
 }: SchemaHashesSelectProps) {
   return (
     <label className={styles.schemaSelectLabel}>
-      Schema
+      <span className={styles.schemaLabelText}>Schema</span>
       <select
         className={styles.schemaSelect}
         value={selectedSchemaHash ?? ""}

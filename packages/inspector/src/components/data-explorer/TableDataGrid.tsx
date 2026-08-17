@@ -769,9 +769,13 @@ export function TableDataGrid() {
     [runtime],
   );
   const queryResult = useAll<DynamicTableRow>(queryBuilder, queryOptions);
-  // show a grid skeleton while the first result is in flight.
-  const isInitialLoading = queryResult.isLoading;
-  const rows = queryResult.data ?? EMPTY_ROWS;
+  const legacyQueryResult = queryResult as unknown as
+    | { data?: DynamicTableRow[]; isLoading?: boolean }
+    | undefined;
+  const rows = Array.isArray(queryResult) ? queryResult : (legacyQueryResult?.data ?? EMPTY_ROWS);
+  const isInitialLoading =
+    queryResult === undefined ||
+    (!Array.isArray(queryResult) && (legacyQueryResult?.isLoading ?? legacyQueryResult?.data === undefined));
 
   const allGridColumns = useMemo<GridColumn[]>(
     () => [
@@ -1569,7 +1573,11 @@ function RelationCell({
     () => new GenericQueryBuilder(relationTable, schema).where({ id: relationId }).limit(1),
     [relationId, relationTable, schema],
   );
-  const { data: relationRows = EMPTY_ROWS } = useAll<DynamicTableRow>(queryBuilder, queryOptions);
+  const relationQueryResult = useAll<DynamicTableRow>(queryBuilder, queryOptions);
+  const legacyRelationResult = relationQueryResult as unknown as { data?: DynamicTableRow[] } | undefined;
+  const relationRows = Array.isArray(relationQueryResult)
+    ? relationQueryResult
+    : (legacyRelationResult?.data ?? EMPTY_ROWS);
   const relationRow = relationRows[0];
   const displayColumn = useMemo(
     () => getRelationDisplayColumn(schema, relationTable),

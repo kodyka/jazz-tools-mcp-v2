@@ -1,9 +1,12 @@
 import { expect, test, type Page } from "@playwright/test";
+import { createJazzContext } from "jazz-tools/backend";
+import { app, permissions } from "./schema.js";
 import { ADMIN_SECRET, APP_ID, TEST_BRANCH, TEST_ENV, TEST_PORT } from "./test-constants.js";
 
 const SERVER_URL = `http://127.0.0.1:${TEST_PORT}`;
 const SCHEMA_HASH = process.env.PUBLISHED_SCHEMA_HASH;
 const STORAGE_KEY = "jazz-inspector-standalone-config";
+const TEST_BACKEND_SECRET = "test";
 
 function storedConfig() {
   return {
@@ -34,8 +37,10 @@ async function storeStandaloneConfig(page: Page) {
 }
 
 async function expectTodosTableLoaded(page: Page) {
-  await expect(page.getByRole("heading", { name: "Tables" })).toBeVisible({ timeout: 15_000 });
-  await expect(page.getByRole("link", { name: "Schema" })).toBeVisible({ timeout: 5_000 });
+  await expect(page.getByRole("heading", { name: "Database" })).toBeVisible({ timeout: 15_000 });
+  await expect(page.getByRole("link", { name: "Schema", exact: true })).toBeVisible({
+    timeout: 5_000,
+  });
   await expect(page.getByRole("checkbox", { name: /Toggle done for/ }).first()).toBeVisible({
     timeout: 15_000,
   });
@@ -89,7 +94,6 @@ test.describe("connection page", () => {
     await expect(page.getByRole("option")).toHaveCount(2);
 
     await page.getByLabel("Schema hash").selectOption({ index: 1 });
-
     await page.getByRole("button", { name: "Use schema" }).click();
 
     await expect(page.getByRole("link", { name: "Data Explorer" })).toBeVisible();
@@ -101,7 +105,7 @@ test.describe("connection page", () => {
     await page.reload();
 
     await expect(page.getByRole("link", { name: "Data Explorer" })).toBeVisible();
-    await expect(page.getByRole("heading", { name: "Tables" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Database" })).toBeVisible();
     await expect(page.getByRole("link", { name: "View todos data" })).toBeVisible();
   });
 
@@ -111,7 +115,6 @@ test.describe("connection page", () => {
     await page.reload();
 
     await expect(page.getByRole("button", { name: "Connections" })).toBeVisible();
-
     await page.getByRole("button", { name: "Connections" }).click();
 
     await expect(page.getByRole("heading", { name: "Connections" })).toBeVisible();
@@ -135,29 +138,26 @@ test.describe("data explorer page", () => {
 
   test("loads data explorer from stored config", async ({ page }) => {
     await page.getByRole("link", { name: "View todos data" }).click();
-
     await expect(page.getByText("First seeded todo")).toBeVisible();
   });
 
   test("loads schema explorer", async ({ page }) => {
-    await page.getByRole("link", { name: "Schema" }).click();
+    await page.getByRole("link", { name: "Schema", exact: true }).click();
 
-    await expect(page.getByText('"name": "title"')).toBeVisible();
-    await expect(page.getByText('"type": "Text"')).toBeVisible();
-    await expect(page.getByText('"name": "done"')).toBeVisible();
-    await expect(page.getByText('"type": "Boolean"')).toBeVisible();
+    await expect(page.getByText('\"name\": \"title\"')).toBeVisible();
+    await expect(page.getByText('\"type\": \"Text\"')).toBeVisible();
+    await expect(page.getByText('\"name\": \"done\"')).toBeVisible();
+    await expect(page.getByText('\"type\": \"Boolean\"')).toBeVisible();
     await expect(page.getByRole("heading", { name: "todos permissions" })).toBeVisible();
-    await expect(page.getByText('"insert"')).toBeVisible();
-    await expect(page.getByText('"update"')).toBeVisible();
-    await expect(page.getByText('"delete"')).toBeVisible();
+    await expect(page.getByText('\"insert\"')).toBeVisible();
+    await expect(page.getByText('\"update\"')).toBeVisible();
+    await expect(page.getByText('\"delete\"')).toBeVisible();
   });
 
   test("opens inline text editor in selected row", async ({ page }) => {
     const title = "First seeded todo";
     const titleCell = page.getByRole("gridcell", { name: title, exact: true });
-
     await titleCell.dblclick();
-
     await expect(page.getByLabel("Edit title")).toBeVisible();
   });
 
@@ -166,7 +166,6 @@ test.describe("data explorer page", () => {
     const updatedTitle = `Discarded inline edit ${Date.now()}`;
 
     await page.getByRole("gridcell", { name: originalTitle, exact: true }).dblclick();
-
     const editor = page.getByLabel("Edit title");
     await editor.fill(updatedTitle);
     await editor.press("Enter");
@@ -177,7 +176,6 @@ test.describe("data explorer page", () => {
     await expect(page.getByRole("gridcell", { name: updatedTitle, exact: true })).toBeVisible();
 
     await page.getByRole("button", { name: "Discard" }).click();
-
     await expect(page.getByRole("button", { name: "Discard" })).toHaveCount(0);
     await expect(page.getByRole("button", { name: "Save changes" })).toHaveCount(0);
     await expect(page.getByRole("gridcell", { name: originalTitle, exact: true })).toBeVisible();
@@ -193,7 +191,6 @@ test.describe("data explorer page", () => {
     const updatedTitle = `Edited ${Date.now()}`;
 
     await page.getByRole("gridcell", { name: originalTitle, exact: true }).dblclick();
-
     const editor = page.getByLabel("Edit title");
     await editor.fill(updatedTitle);
     await editor.press("Enter");
@@ -201,7 +198,6 @@ test.describe("data explorer page", () => {
     const queuedBanner = page.getByRole("status");
     await expect(queuedBanner).toContainText("Queued");
     await expect(queuedBanner).toContainText("1 edit across 1 row");
-
     await page.getByRole("button", { name: "Save changes" }).click();
     await expect(page.getByRole("button", { name: "Save changes" })).toHaveCount(0);
 
@@ -216,14 +212,12 @@ test.describe("data explorer page", () => {
     const title = "Second seeded todo";
     const targetRow = rowByTitle(page, title);
     const toggle = targetRow.getByRole("checkbox");
-
     const initialChecked = await toggle.isChecked();
     await toggle.click();
 
     const queuedBanner = page.getByRole("status");
     await expect(queuedBanner).toContainText("Queued");
     await expect(queuedBanner).toContainText("1 edit across 1 row");
-
     await page.getByRole("button", { name: "Save changes" }).click();
     await expect(page.getByRole("button", { name: "Save changes" })).toHaveCount(0);
 
@@ -231,49 +225,78 @@ test.describe("data explorer page", () => {
     await expect(rowByTitle(page, title).getByRole("checkbox")).toHaveJSProperty(
       "checked",
       !initialChecked,
-      {
-        timeout: 15_000,
-      },
+      { timeout: 15_000 },
     );
   });
 
   test("filters rows to done=true and shows only checked boolean cells", async ({ page }) => {
-    const visibleCheckboxesBeforeFilter = page.getByRole("checkbox", { name: /Toggle done for/ });
-    await expect
-      .poll(async () => await visibleCheckboxesBeforeFilter.count(), { timeout: 15_000 })
-      .toBeGreaterThan(0);
-    const visibleCheckboxCountBeforeFilter = await visibleCheckboxesBeforeFilter.count();
-    expect(visibleCheckboxCountBeforeFilter).toBeGreaterThan(0);
+    // Earlier tests intentionally mutate the first two seeded rows. Use untouched
+    // deterministic fixtures here so the filter assertion is independent of test
+    // ordering while still proving both false and true values before filtering.
+    const falseTodo = rowByTitle(page, "Seeded todo 000003");
+    const trueTodo = rowByTitle(page, "Seeded todo 000004");
+    await expect(falseTodo).toBeVisible({ timeout: 15_000 });
+    await expect(trueTodo).toBeVisible({ timeout: 15_000 });
+    await expect(falseTodo.getByRole("checkbox")).not.toBeChecked();
+    await expect(trueTodo.getByRole("checkbox")).toBeChecked();
 
-    let uncheckedBeforeFilter = 0;
-    for (let index = 0; index < visibleCheckboxCountBeforeFilter; index += 1) {
-      if (!(await visibleCheckboxesBeforeFilter.nth(index).isChecked())) {
-        uncheckedBeforeFilter += 1;
-      }
-    }
-    expect(uncheckedBeforeFilter).toBeGreaterThan(0);
+    const filterRegion = page.getByRole("region", { name: "Filter rows" });
+    await filterRegion.getByLabel("Column", { exact: true }).selectOption("done");
+    await filterRegion.getByLabel("Value", { exact: true }).fill("true");
+    await filterRegion.getByRole("button", { name: "Add where clause" }).click();
+    await expect(filterRegion.getByText("done eq true", { exact: true })).toBeVisible();
 
-    await page.getByRole("button", { name: "Filter" }).click();
-
-    const dialog = page.getByRole("dialog", { name: "Filter rows" });
-    await expect(dialog).toBeVisible();
-
-    await dialog.getByLabel("Column").selectOption("done");
-    await dialog.getByLabel("Value").fill("true");
-    await dialog.getByRole("button", { name: "Add where clause" }).click();
-    await dialog.getByRole("button", { name: "Close" }).click();
-
-    const filterButton = page.getByRole("button", { name: "Filter (1)" });
-    await expect(dialog).not.toBeVisible();
-    await expect(filterButton).toBeVisible();
-
+    await expect(falseTodo).toHaveCount(0, { timeout: 15_000 });
     const checkboxes = page.getByRole("checkbox", { name: /Toggle done for/ });
     await expect.poll(async () => await checkboxes.count(), { timeout: 15_000 }).toBeGreaterThan(0);
     const checkboxCount = await checkboxes.count();
-    expect(checkboxCount).toBeGreaterThan(0);
-
     for (let index = 0; index < checkboxCount; index += 1) {
       await expect(checkboxes.nth(index)).toBeChecked();
+    }
+  });
+
+  test("reacts to insert, update, and delete from a second Jazz writer without refresh", async ({
+    page,
+  }) => {
+    const context = createJazzContext({
+      appId: APP_ID,
+      app,
+      permissions,
+      driver: { type: "memory" },
+      serverUrl: SERVER_URL,
+      backendSecret: TEST_BACKEND_SECRET,
+      env: TEST_ENV,
+      userBranch: TEST_BRANCH,
+      defaultDurabilityTier: "global",
+    });
+    const externalWriter = context.asBackend();
+    const title = `External realtime ${Date.now()}`;
+    const params = new URLSearchParams({
+      filters: JSON.stringify([
+        { id: "external-realtime-title", column: "title", operator: "eq", value: title },
+      ]),
+    });
+
+    try {
+      await page.goto(`/data-explorer/todos/data?${params.toString()}`);
+      await expect(page.getByText(`title eq ${title}`, { exact: true })).toBeVisible();
+      await expect(rowByTitle(page, title)).toHaveCount(0);
+
+      const created = externalWriter.insert(app.todos, { title, done: false });
+      await created.wait({ tier: "global" });
+      const createdRow = created.value;
+
+      const externalRow = rowByTitle(page, title);
+      await expect(externalRow).toBeVisible({ timeout: 15_000 });
+      await expect(externalRow.getByRole("checkbox")).not.toBeChecked();
+
+      await externalWriter.update(app.todos, createdRow.id, { done: true }).wait({ tier: "global" });
+      await expect(externalRow.getByRole("checkbox")).toBeChecked({ timeout: 15_000 });
+
+      await externalWriter.delete(app.todos, createdRow.id).wait({ tier: "global" });
+      await expect(externalRow).toHaveCount(0, { timeout: 15_000 });
+    } finally {
+      await context.shutdown();
     }
   });
 });

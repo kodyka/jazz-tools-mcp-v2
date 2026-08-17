@@ -17,6 +17,7 @@ import { Link } from "react-router";
 import { useDevtoolsContext } from "../../contexts/devtools-context.js";
 import { useHostSubscriptions } from "../../contexts/host-link.js";
 import { useStandaloneContext } from "../../contexts/standalone-context.js";
+import { tableViewPath } from "../../utility/data-explorer-routes.js";
 import { LiveQueryFilters } from "./LiveQueryFilters.js";
 import styles from "./index.module.css";
 
@@ -69,7 +70,7 @@ function extractFiltersFromIR(node: unknown): FilterClause[] {
 }
 
 function buildExplorerUrl(table: string, queryJson: string): string {
-  const base = `/data-explorer/${table}/data`;
+  const base = tableViewPath(table, "data");
   try {
     const parsed = JSON.parse(queryJson);
     const filters = extractFiltersFromIR(parsed.relation_ir);

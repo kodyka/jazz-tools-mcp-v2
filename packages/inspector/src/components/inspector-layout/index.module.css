@@ -9,47 +9,188 @@
 }
 
 .topBar {
-  height: 34px;
+  height: 50px;
   box-sizing: border-box;
-  flex: 0 0 34px;
-  border-bottom: 1px solid var(--jz-border);
-  background: var(--jz-bg);
-  padding: 0 10px;
+  flex: 0 0 50px;
+  border-bottom: 1px solid var(--jz-border-strong);
+  background: #0d131b;
+  padding: 0 12px;
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 12px;
 }
 
+.topBarPrimary {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  min-width: 0;
+}
+
+.brandIcon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  flex: 0 0 30px;
+  border: 1px solid #2d4057;
+  border-radius: 7px;
+  background: linear-gradient(180deg, #182536 0%, #111a27 100%);
+  color: #8bd2db;
+}
+
+.brandCopy {
+  display: grid;
+  gap: 1px;
+  line-height: 1.1;
+}
+
+.brandTitle {
+  color: #edf3fb;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  white-space: nowrap;
+}
+
+.brandSubtitle {
+  color: #718096;
+  font-size: 10px;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.topBarDivider {
+  width: 1px;
+  height: 28px;
+  flex: 0 0 1px;
+  background: #263143;
+}
+
+.locationGroup {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.breadcrumbs {
+  min-width: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.breadcrumbMuted {
+  color: #75849a;
+}
+
+.breadcrumbSeparator {
+  color: #465469;
+}
+
+.breadcrumbCurrent {
+  min-width: 0;
+  max-width: 220px;
+  overflow: hidden;
+  color: #cbd5e3;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .tabBar {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 4px;
 }
 
 .topBarActions {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
+}
+
+.liveConnection {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 28px;
+  max-width: 220px;
+  border: 1px solid #214d42;
+  border-radius: 6px;
+  background: rgba(25, 92, 73, 0.13);
+  padding: 0 9px;
+  color: #8fd9c3;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.liveDot {
+  width: 7px;
+  height: 7px;
+  flex: 0 0 7px;
+  border-radius: 999px;
+  background: #55d3aa;
+  box-shadow: 0 0 0 3px rgba(85, 211, 170, 0.11);
+  animation: livePulse 2.2s ease-in-out infinite;
+}
+
+.liveLabel {
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.connectionApp {
+  min-width: 0;
+  overflow: hidden;
+  color: #91a2b8;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+  font-size: 10px;
+  font-weight: 500;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .schemaSelectLabel {
   display: flex;
   align-items: center;
-  gap: 8px;
-  color: #9ca8b9;
-  font-size: 12px;
+  gap: 7px;
+  color: #7f8da1;
+  font-size: 11px;
   font-weight: 600;
 }
 
+.schemaLabelText {
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
 .schemaSelect {
-  border: 1px solid var(--jz-border);
-  background: var(--jz-surface);
-  color: #9ca8b9;
-  border-radius: 4px;
+  border: 1px solid #2b3749;
+  background: #121a25;
+  color: #aab7c9;
+  border-radius: 6px;
   padding: 5px 8px;
-  font-size: 12px;
-  min-width: 220px;
+  font-size: 11px;
+  min-width: 200px;
+  max-width: 260px;
+}
+
+.schemaSelect:focus-visible {
+  outline: 2px solid var(--jz-focus);
+  outline-offset: 1px;
 }
 
 .schemaSelect:disabled {
@@ -60,21 +201,21 @@
 .tabLink {
   display: inline-flex;
   align-items: center;
-  height: 24px;
-  padding: 0 10px;
-  border-radius: 5px;
-  color: var(--jz-faint);
+  height: 28px;
+  padding: 0 9px;
+  border-radius: 6px;
+  color: #7f8ca0;
   text-decoration: none;
-  font-size: 13px;
-  font-weight: 500;
+  font-size: 12px;
+  font-weight: 550;
   transition:
     background-color 0.14s ease,
     color 0.14s ease;
 }
 
 .tabLink:hover {
-  background: var(--jz-surface);
-  color: var(--jz-text);
+  background: #17202c;
+  color: #d0d9e7;
 }
 
 .tabLink:focus-visible {
@@ -82,52 +223,45 @@
   outline-offset: -2px;
 }
 
-/* Active tab reuses the app's selected-state fill (active table link / icon
-   button). After the :hover rule so an active+hovered tab keeps the fill. */
 .tabLinkActive,
 .tabLinkActive:hover {
-  background: var(--jz-selected);
-  color: var(--jz-ink-strong);
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .tabLink {
-    transition: none;
-  }
+  background: #1b2736;
+  color: #edf3fb;
 }
 
 .resetButton {
-  border: 1px solid var(--jz-border);
-  background: var(--jz-surface);
-  color: #9ca8b9;
-  border-radius: 4px;
+  min-height: 28px;
+  border: 1px solid #2b3749;
+  background: #121a25;
+  color: #9eacc0;
+  border-radius: 6px;
   padding: 5px 10px;
-  font-size: 12px;
+  font-size: 11px;
   cursor: pointer;
 }
 
 .resetButton:hover {
-  background: var(--jz-border);
-  color: #d4dae3;
+  background: #1a2431;
+  color: #d9e2ef;
 }
 
 .iconButton {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 26px;
-  height: 26px;
-  border: 1px solid var(--jz-border);
-  background: var(--jz-surface);
-  color: #9ca8b9;
-  border-radius: 4px;
+  width: 28px;
+  height: 28px;
+  border: 1px solid #2b3749;
+  background: #121a25;
+  color: #92a0b5;
+  border-radius: 6px;
   cursor: pointer;
   text-decoration: none;
 }
 
 .iconButton:hover {
-  background: var(--jz-border);
-  color: #d4dae3;
+  background: #1a2431;
+  color: #d9e2ef;
 }
 
 .iconButtonActive,
@@ -143,4 +277,60 @@
   box-sizing: border-box;
   overflow: hidden;
   padding: 0;
+}
+
+@keyframes livePulse {
+  0%,
+  100% {
+    opacity: 0.75;
+    transform: scale(0.95);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.08);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tabLink {
+    transition: none;
+  }
+
+  .liveDot {
+    animation: none;
+  }
+}
+
+@media (max-width: 1080px) {
+  .breadcrumbs,
+  .brandSubtitle,
+  .connectionApp,
+  .schemaLabelText {
+    display: none;
+  }
+
+  .schemaSelect {
+    min-width: 150px;
+    max-width: 180px;
+  }
+}
+
+@media (max-width: 760px) {
+  .topBar {
+    padding-inline: 8px;
+  }
+
+  .brandCopy,
+  .topBarDivider,
+  .liveConnection {
+    display: none;
+  }
+
+  .locationGroup {
+    gap: 6px;
+  }
+
+  .tabLink {
+    padding-inline: 7px;
+  }
 }

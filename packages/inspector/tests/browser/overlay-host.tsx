@@ -17,6 +17,12 @@ const TEST_ENV = "dev";
 const TEST_BRANCH = "main";
 const TEST_PORT = 19879;
 const SERVER_URL = `http://127.0.0.1:${TEST_PORT}`;
+const TEST_WORKER_URL = "/tests/browser/jazz-test-worker.ts";
+const TEST_BROKER_WORKER_URL = "/tests/browser/jazz-test-broker-worker.ts";
+// Intentionally extensionless. Jazz transports this URL in the worker module's
+// query string; ending the value in `.wasm` makes vite-plugin-wasm misclassify
+// the worker module ID as a WASM file.
+const TEST_WASM_URL = "/__jazz/test-runtime";
 
 function HostInner() {
   const { db } = useJazzClient();
@@ -53,12 +59,27 @@ function HostApp() {
     return <p id="host-status">Authenticating...</p>;
   }
 
+  const origin = window.location.origin;
   const config: DbConfig = {
     appId: APP_ID,
     env: TEST_ENV,
     userBranch: TEST_BRANCH,
     serverUrl: SERVER_URL,
     secret,
+    // Subscription traces are registered when subscribeAll() starts. The host
+    // query mounts before installInspectorHost() can run its effect, so enable
+    // dev mode at Db construction time to make this fixture deterministic and
+    // test the same telemetry the overlay is designed to display.
+    devMode: true,
+    // Keep the Worker and SharedWorker on explicit same-origin Vite module URLs.
+    // These tiny entry modules import the pinned jazz-tools worker files through
+    // aliases in vite.config.ts, allowing Vite to transform their complete ESM
+    // dependency graphs instead of serving one raw dist file.
+    runtimeSources: {
+      workerUrl: new URL(TEST_WORKER_URL, origin).href,
+      brokerWorkerUrl: new URL(TEST_BROKER_WORKER_URL, origin).href,
+      wasmUrl: new URL(TEST_WASM_URL, origin).href,
+    },
   };
 
   return (

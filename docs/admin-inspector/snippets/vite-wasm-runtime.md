@@ -1,3 +1,12 @@
+# Full snippet — Vite WASM runtime/E2E configuration
+
+The extracted Inspector needs three details simultaneously:
+
+1. Jazz's `buildJazzViteConfig()` for Jazz-specific aliases/optimizer behavior;
+2. `vite-plugin-wasm` for the published package's WebAssembly ESM graph;
+3. an extensionless **test runtime URL**, because Jazz transports that URL in the worker module query string and `vite-plugin-wasm@3.6.0` matches IDs using `endsWith(".wasm")`.
+
+```ts
 import { readFileSync } from "node:fs";
 import { createRequire } from "node:module";
 import { dirname, resolve } from "node:path";
@@ -6,37 +15,13 @@ import { buildJazzViteConfig } from "jazz-tools/dev/vite";
 import { defineConfig, type Plugin, type UserConfig } from "vite";
 import wasm from "vite-plugin-wasm";
 
-/**
- * The extracted Inspector consumes the published `jazz-tools` package instead
- * of the Jazz monorepo workspace source. In that layout `jazz-tools` dynamically
- * imports `jazz-wasm`, so we must apply Jazz's supported Vite config hook:
- *
- * - exclude `jazz-wasm` from Vite/esbuild dependency pre-bundling;
- * - resolve the nested pnpm `jazz-wasm` dependency to an absolute entry;
- * - keep workers in ES-module format.
- *
- * The published worker graph also reaches wasm-bindgen's ESM WebAssembly
- * integration during dev/E2E. Vite does not transform that syntax by default,
- * so vite-plugin-wasm is applied to the main dev graph and worker builds.
- * The plugin emits top-level await; targeting esnext avoids the incompatible
- * vite-plugin-top-level-await/SWC rewrite while matching the modern-browser
- * Inspector runtime.
- */
 const jazzRuntimeConfig = buildJazzViteConfig({});
-
 const require = createRequire(import.meta.url);
 const jazzToolsPackageRoot = dirname(require.resolve("jazz-tools/package.json"));
 const jazzToolsRequire = createRequire(resolve(jazzToolsPackageRoot, "package.json"));
 const jazzWasmEntry = jazzToolsRequire.resolve("jazz-wasm");
 const jazzViteAliases = jazzRuntimeConfig.resolve?.alias ?? [];
 
-/**
- * The published package intentionally ships the dedicated worker as normal
- * transpiled ESM, not as one self-contained browser file. Point local E2E entry
- * modules at the package files and let Vite transform the complete dependency
- * graph. This is different from serving dist/worker/jazz-worker.js verbatim,
- * which leaves its ../runtime imports and dynamic jazz-wasm import unresolved.
- */
 const testWorkerAliases = [
   {
     find: /^@jazz-test-worker-entry$/,
@@ -48,12 +33,8 @@ const testWorkerAliases = [
   },
 ];
 
-/**
- * Keep this route extensionless. Jazz passes `wasmUrl` through a query parameter
- * on the worker module URL. `vite-plugin-wasm@3.6.0` detects WASM with a simple
- * `id.endsWith(".wasm")`; if this runtime URL ends in `.wasm`, the plugin can
- * mistake the whole worker module ID for a local WASM file.
- */
+// Deliberately no `.wasm` suffix: this URL is serialized into the worker
+// module's query string. The response still has the correct WASM content type.
 const testRuntimeFiles = new Map<string, { path: string; contentType: string }>([
   [
     "/__jazz/test-runtime",
@@ -64,12 +45,6 @@ const testRuntimeFiles = new Map<string, { path: string; contentType: string }>(
   ],
 ]);
 
-/**
- * Browser E2E uses a real host bundle plus the separately-built embedded
- * Inspector. Both clients receive explicit worker URLs pointing at local test
- * entry modules in Vite's normal module graph, while the WASM binary is served
- * at one stable same-origin URL.
- */
 function inspectorBrowserTestRuntimePlugin(): Plugin {
   return {
     name: "inspector-browser-test-runtime",
@@ -103,7 +78,6 @@ const sharedConfig = {
   },
   worker: {
     ...(jazzRuntimeConfig.worker ?? {}),
-    // Vite requires fresh plugin instances for parallel worker builds.
     plugins: () => createWasmPlugins(),
   },
 };
@@ -125,7 +99,6 @@ export default defineConfig(({ mode }): UserConfig => {
     };
   }
 
-  // The standalone "web" build (the default).
   return {
     ...sharedConfig,
     plugins,
@@ -138,3 +111,16 @@ export default defineConfig(({ mode }): UserConfig => {
     },
   };
 });
+```
+
+And the browser fixture must publish the same extensionless URL:
+
+```ts
+const TEST_WASM_URL = "/__jazz/test-runtime";
+
+runtimeSources: {
+  workerUrl: new URL(TEST_WORKER_URL, origin).href,
+  brokerWorkerUrl: new URL(TEST_BROKER_WORKER_URL, origin).href,
+  wasmUrl: new URL(TEST_WASM_URL, origin).href,
+},
+```
