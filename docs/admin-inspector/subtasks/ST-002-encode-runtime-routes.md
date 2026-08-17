@@ -2,45 +2,15 @@
 
 Parent: Task 00
 Priority: P1
-Status: open follow-up
+Status: partially implemented; grid toolbar follow-up remains
 
 ## Problem
 
 Runtime table names are data, not URL syntax. Table names can contain characters such as `/`, `#`, spaces, `?`, or `%`; every route producer must encode the runtime table segment before inserting it into a path.
 
-The review found two remaining raw producers:
+## Implemented
 
-### 1. Data grid toolbar Schema link
-
-```tsx
-// current
-<Link to={`/data-explorer/${table}/schema`} aria-label="Schema">
-
-// required
-<Link to={`/data-explorer/${encodeURIComponent(table)}/schema`} aria-label="Schema">
-```
-
-### 2. Live Query -> Data Explorer link
-
-```ts
-// current
-function buildExplorerUrl(table: string, queryJson: string): string {
-  const base = `/data-explorer/${table}/data`;
-  // ...
-}
-
-// required
-function buildExplorerUrl(table: string, queryJson: string): string {
-  const base = `/data-explorer/${encodeURIComponent(table)}/data`;
-  // ...
-}
-```
-
-Sidebar data/schema links, relation navigation, and the stale-table redirect are already encoded.
-
-## Preferred implementation
-
-Centralize path construction instead of repeating interpolation:
+A shared helper now owns Data Explorer path construction:
 
 ```ts
 export type TableView = "data" | "schema";
@@ -50,17 +20,29 @@ export function tableViewPath(tableName: string, view: TableView): string {
 }
 ```
 
-Then use:
-
-```tsx
-<Link to={tableViewPath(table, "schema")} aria-label="Schema">
-```
-
-and:
+`Live Query -> Data Explorer` now uses:
 
 ```ts
 const base = tableViewPath(table, "data");
 ```
+
+Regression tests cover `/`, space, `#`, `?`, `%`, and ordinary table names.
+
+Sidebar data/schema links, relation navigation, and the stale-table redirect were already encoded before this subtask.
+
+## Remaining raw producer
+
+### Data grid toolbar Schema link
+
+```tsx
+// current
+<Link to={`/data-explorer/${table}/schema`} aria-label="Schema">
+
+// required
+<Link to={tableViewPath(table, "schema")} aria-label="Schema">
+```
+
+This file is large and also contains the separate alpha/current `useAll()` compatibility cleanup. Keep the remaining grid change in one focused full-file patch with ST-003 so the compatibility and route imports/tests can be reviewed together.
 
 ## Regression case
 
@@ -81,17 +63,16 @@ Filter/query values stay in `URLSearchParams`, not the path.
 
 ## Checklist
 
-- [ ] add or reuse a centralized `tableViewPath()` helper;
+- [x] add centralized `tableViewPath()` helper;
+- [x] patch Live Query `buildExplorerUrl()`;
+- [x] add helper unit coverage for route-significant characters;
+- [x] keep relation IDs/filter JSON in `URLSearchParams`;
 - [ ] patch the grid toolbar Schema link;
-- [ ] patch Live Query `buildExplorerUrl()`;
-- [ ] search every `data-explorer/${...}` producer;
-- [ ] keep route params decoded only at the route boundary;
-- [ ] keep relation IDs/filter JSON in `URLSearchParams`;
-- [ ] add unit coverage for `/`, space, `#`, `?`, and `%`;
+- [ ] use the shared helper in that grid link;
 - [ ] add a component regression for the Schema toolbar href;
-- [ ] add a Live Query regression for the Data Explorer href;
+- [ ] re-search every `data-explorer/${...}` producer after the grid patch;
 - [ ] add browser coverage if the dynamic test schema can expose such a table safely.
 
 ## Acceptance
 
-No runtime table string can accidentally create a new path segment, query string, fragment, or malformed navigation target.
+Complete when no runtime table string can accidentally create a new path segment, query string, fragment, or malformed navigation target. The Live Query path is fixed; the grid toolbar path remains explicit follow-up work.

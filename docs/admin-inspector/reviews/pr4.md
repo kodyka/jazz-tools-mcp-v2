@@ -6,7 +6,7 @@ PR: `#4 feat: add Jazz Admin Inspector plan and WhoDB-inspired shell`
 
 The core architecture is correct: retain runtime schema discovery, generic Jazz queries, reactive reads, and Jazz mutations. WhoDB should influence navigation density, CRUD discoverability, destructive-action UX, schema access, and test organization—not the backend data layer.
 
-The P0 embedded runtime/CI blocker is resolved. CI run #73 is fully green. Two P1 cleanup items remain explicitly open: complete runtime-route encoding and centralize the published-alpha/current `useAll()` compatibility bridge.
+The P0 embedded runtime/CI blocker is resolved. CI run #73 was fully green. One of the two raw runtime-route producers discovered afterward (Live Query) is now fixed through a shared encoded path helper and regression tests. The remaining grid toolbar route plus the alpha/current `useAll()` compatibility consolidation remain explicit P1 work.
 
 ## CI evidence reviewed
 
@@ -60,7 +60,7 @@ Jazz records an active-query trace when the subscription starts only if `DbConfi
 
 Resolution: initialize the browser test host with `devMode: true` before `JazzProvider` creates the query subscription.
 
-### Run #73 — final green gate
+### Run #73 — completed P0 gate
 Commit: `96ba2c4aa291997a64a5b9dd512e3bd99681d967`
 
 - root `npm run check`: passed;
@@ -81,25 +81,43 @@ Commit: `96ba2c4aa291997a64a5b9dd512e3bd99681d967`
 5. Test asserting a non-contract overlay `wasmUrl` field.
 6. Browser fixture enabling DevTools telemetry after its first query subscription had already registered.
 
-## Remaining P1 findings
+## P1 route finding — partially implemented
 
-### P1 — two runtime table route producers still interpolate raw table names
+The review found two raw runtime table path producers after the earlier sidebar/relation fixes.
 
-The sidebar, relation navigation, and stale-table redirect are encoded, but review found two remaining raw path producers:
+### Fixed: Live Query
 
-```tsx
-// TableDataGrid toolbar
-to={`/data-explorer/${table}/schema`}
-```
+Previously:
 
 ```ts
-// Live Query
 const base = `/data-explorer/${table}/data`;
 ```
 
-Both should use one `tableViewPath()` helper based on `encodeURIComponent(tableName)` and receive special-character regression coverage. See ST-002 and `snippets/route-safety.md`.
+Now:
 
-### P1 — `useAll()` compatibility logic is duplicated
+```ts
+const base = tableViewPath(table, "data");
+```
+
+with:
+
+```ts
+export function tableViewPath(tableName: string, view: "data" | "schema"): string {
+  return `/data-explorer/${encodeURIComponent(tableName)}/${view}`;
+}
+```
+
+Unit coverage includes slash, hash, query, percent, whitespace, and ordinary table names.
+
+### Remaining: `TableDataGrid` toolbar Schema link
+
+```tsx
+to={`/data-explorer/${table}/schema`}
+```
+
+It should use `tableViewPath(table, "schema")` and get a component-level href regression. See ST-002.
+
+## Remaining P1 — `useAll()` compatibility logic is duplicated
 
 The extracted fork supports the published alpha's legacy array/undefined result shape while tolerating current Jazz's structured `{ data, isLoading, error }` state. Main-grid and relation-cell branching should move into one tested `normalizeUseAllResult()` utility. See ST-003 and `snippets/use-all-normalizer.md`.
 
@@ -115,4 +133,4 @@ WhoDB remains a UX/testing reference: database-object navigation, searchable/den
 
 ## Merge gate
 
-The required P0 gate is now green in run #73. Browser E2E remains mandatory on future heads because unit tests cannot validate the published worker/WASM/embedded runtime path or two-writer realtime behavior.
+Browser E2E remains mandatory on every final head because unit tests cannot validate the published worker/WASM/embedded runtime path or two-writer realtime behavior. The route-helper changes are running through the same CI workflow before finalizing the PR state.

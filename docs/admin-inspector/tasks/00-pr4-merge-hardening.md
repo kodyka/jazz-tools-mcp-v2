@@ -1,7 +1,7 @@
 # Task 00 — PR #4 merge hardening
 
 Priority: P0
-Status: P0 complete; P1 cleanup remains
+Status: P0 complete; P1 cleanup partially implemented
 
 ## Goal
 
@@ -21,13 +21,15 @@ Make PR #4 mergeable with a passing end-to-end Inspector gate and track the rema
 - [x] Confirm final CI standalone/embedded builds pass.
 - [x] Confirm final CI embedded overlay passes.
 
-### T00.2 Encode every runtime table route — P1 follow-up
+### T00.2 Encode every runtime table route — P1 partially implemented
 - [x] Sidebar data/schema routes encoded.
 - [x] Relation-navigation route encoded.
 - [x] Stale-table redirect encoded.
-- [ ] Grid toolbar Schema link encoded.
-- [ ] Live Query `buildExplorerUrl()` table segment encoded.
-- [ ] Add special-character route regression coverage.
+- [x] Add shared `tableViewPath()` helper.
+- [x] Live Query `buildExplorerUrl()` uses the shared encoded path helper.
+- [x] Add special-character helper regression coverage.
+- [ ] Grid toolbar Schema link uses the shared encoded helper.
+- [ ] Add grid component regression for the Schema link.
 
 ### T00.3 Isolate `useAll()` compatibility — P1 follow-up
 - [ ] Add `normalizeUseAllResult()` utility.
@@ -38,13 +40,15 @@ Make PR #4 mergeable with a passing end-to-end Inspector gate and track the rema
 
 ### T00.4 Final P0 merge gate
 - [x] root `npm run check && npm test && npm run build`.
-- [x] Inspector `pnpm test` — 84/84.
+- [x] Inspector `pnpm test` — 84/84 at the P0 gate.
 - [x] Inspector `pnpm build` — standalone + embedded.
 - [x] `pnpm build:vercel` and output verification.
 - [x] `pnpm test:browser` — 13/13.
 
-Verified by CI run #73 on commit `96ba2c4aa291997a64a5b9dd512e3bd99681d967`.
+P0 verification: CI run #73 on commit `96ba2c4aa291997a64a5b9dd512e3bd99681d967`.
+
+The later route-helper head adds an additional utility regression test and is re-running the same required CI workflow before the PR is considered final.
 
 ## Acceptance
 
-The P0 merge blocker is resolved and the full required CI gate is green. The two P1 items above remain explicit follow-up work; they are not prerequisites for claiming the embedded runtime/CI fix is complete.
+The P0 merge blocker is resolved and the required runtime gate has been proven green. The Live Query route gap is now fixed. The remaining grid-route and `useAll()` normalization work stays explicitly tracked as P1 cleanup rather than being silently folded into the completed P0 claim.
