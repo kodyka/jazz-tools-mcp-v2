@@ -38,17 +38,17 @@ Make PR #4 mergeable with a passing end-to-end Inspector gate and track the rema
 - [ ] Use helper in relation query.
 - [ ] Document removal condition when the pinned Jazz alpha no longer needs compatibility.
 
-### T00.4 Final P0 merge gate
+### T00.4 Final merge gate
 - [x] root `npm run check && npm test && npm run build`.
-- [x] Inspector `pnpm test` — 84/84 at the P0 gate.
+- [x] Inspector `pnpm test`.
 - [x] Inspector `pnpm build` — standalone + embedded.
 - [x] `pnpm build:vercel` and output verification.
 - [x] `pnpm test:browser` — 13/13.
 
-P0 verification: CI run #73 on commit `96ba2c4aa291997a64a5b9dd512e3bd99681d967`.
+P0 runtime hardening was first proven fully green in CI run #73 on commit `96ba2c4aa291997a64a5b9dd512e3bd99681d967`.
 
-The later route-helper head adds an additional utility regression test and is re-running the same required CI workflow before the PR is considered final.
+The route-helper implementation and special-character unit coverage were then validated by **final-head CI run #78** on commit `705e38ebb229dd1b06f9d4d521932490e0bfe341`: both root and Inspector jobs completed successfully, including the full browser E2E suite.
 
 ## Acceptance
 
-The P0 merge blocker is resolved and the required runtime gate has been proven green. The Live Query route gap is now fixed. The remaining grid-route and `useAll()` normalization work stays explicitly tracked as P1 cleanup rather than being silently folded into the completed P0 claim.
+The P0 merge blocker is resolved and the current implementation head has a green required CI gate. The Live Query route gap is fixed. The remaining grid-route and `useAll()` normalization work stays explicitly tracked as P1 cleanup rather than being silently folded into the completed P0 claim.

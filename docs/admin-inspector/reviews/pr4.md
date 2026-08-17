@@ -6,7 +6,9 @@ PR: `#4 feat: add Jazz Admin Inspector plan and WhoDB-inspired shell`
 
 The core architecture is correct: retain runtime schema discovery, generic Jazz queries, reactive reads, and Jazz mutations. WhoDB should influence navigation density, CRUD discoverability, destructive-action UX, schema access, and test organization—not the backend data layer.
 
-The P0 embedded runtime/CI blocker is resolved. CI run #73 was fully green. One of the two raw runtime-route producers discovered afterward (Live Query) is now fixed through a shared encoded path helper and regression tests. The remaining grid toolbar route plus the alpha/current `useAll()` compatibility consolidation remain explicit P1 work.
+The P0 embedded runtime/CI blocker is resolved. One of the two raw runtime-route producers discovered afterward (Live Query) is now fixed through a shared encoded path helper and regression tests. The remaining grid toolbar route plus the alpha/current `useAll()` compatibility consolidation remain explicit P1 work.
+
+The implementation head `705e38ebb229dd1b06f9d4d521932490e0bfe341` passed final-head CI run #78.
 
 ## CI evidence reviewed
 
@@ -60,7 +62,7 @@ Jazz records an active-query trace when the subscription starts only if `DbConfi
 
 Resolution: initialize the browser test host with `devMode: true` before `JazzProvider` creates the query subscription.
 
-### Run #73 — completed P0 gate
+### Run #73 — completed P0 runtime gate
 Commit: `96ba2c4aa291997a64a5b9dd512e3bd99681d967`
 
 - root `npm run check`: passed;
@@ -71,6 +73,17 @@ Commit: `96ba2c4aa291997a64a5b9dd512e3bd99681d967`
 - Vercel build + `dist/index.html` verification: passed;
 - Chromium installation: passed;
 - Playwright browser E2E: 13/13 passed.
+
+### Run #78 — final-head route-helper gate
+Commit: `705e38ebb229dd1b06f9d4d521932490e0bfe341`
+
+- root check/test/build: passed;
+- Inspector unit tests including the new route-path regression: passed;
+- standalone + embedded build: passed;
+- Vercel verification: passed;
+- Chromium installation: passed;
+- browser E2E: passed;
+- both required CI jobs concluded successfully.
 
 ## Bugs fixed in the P0 hardening chain
 
@@ -133,4 +146,4 @@ WhoDB remains a UX/testing reference: database-object navigation, searchable/den
 
 ## Merge gate
 
-Browser E2E remains mandatory on every final head because unit tests cannot validate the published worker/WASM/embedded runtime path or two-writer realtime behavior. The route-helper changes are running through the same CI workflow before finalizing the PR state.
+Final-head run #78 is green. Browser E2E remains mandatory on future heads because unit tests cannot validate the published worker/WASM/embedded runtime path or two-writer realtime behavior.
