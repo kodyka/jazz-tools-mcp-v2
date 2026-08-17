@@ -51,9 +51,10 @@ test.describe("inspector overlay (embedded, own worker connection end-to-end)", 
     });
 
     // Embedded build assets are served by the test because they are produced in
-    // dist-embedded rather than Vite's dev module graph. The broker worker is
-    // intentionally NOT intercepted here: SharedWorker must fetch the stable
-    // URL directly from the Vite dev server middleware in vite.config.ts.
+    // dist-embedded rather than Vite's dev module graph. Worker entry modules
+    // are intentionally NOT intercepted here: they must load through Vite so
+    // the published jazz-tools worker dependency graph receives the same WASM
+    // transforms used by the host fixture.
     await page.route("**/__jazz/embedded/**", async (route) => {
       const pathname = new URL(route.request().url()).pathname;
       const rel =
@@ -103,7 +104,7 @@ test.describe("inspector overlay (embedded, own worker connection end-to-end)", 
         ).__jazzInspectorHost?.getConnectionConfig().runtimeSources,
     );
     expect(runtimeSources?.brokerWorkerUrl).toBe(
-      new URL("/__jazz/test-broker-worker.js", page.url()).href,
+      new URL("/tests/browser/jazz-test-broker-worker.ts", page.url()).href,
     );
     expect(runtimeSources?.wasmUrl).toBe(new URL("/__jazz/test-runtime", page.url()).href);
 
