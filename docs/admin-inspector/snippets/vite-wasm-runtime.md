@@ -1,3 +1,8 @@
+# Full snippet — Vite WASM runtime/E2E configuration
+
+This is the complete intended `packages/inspector/vite.config.ts` shape for the extracted published-package setup.
+
+```ts
 import { readFileSync } from "node:fs";
 import { createRequire } from "node:module";
 import { dirname, resolve } from "node:path";
@@ -7,20 +12,6 @@ import { defineConfig, type Plugin, type UserConfig } from "vite";
 import topLevelAwait from "vite-plugin-top-level-await";
 import wasm from "vite-plugin-wasm";
 
-/**
- * The extracted Inspector consumes the published `jazz-tools` package instead
- * of the Jazz monorepo workspace source. In that layout `jazz-tools` dynamically
- * imports `jazz-wasm`, so we must apply Jazz's supported Vite config hook:
- *
- * - exclude `jazz-wasm` from Vite/esbuild dependency pre-bundling;
- * - resolve the nested pnpm `jazz-wasm` dependency to an absolute entry;
- * - keep workers in ES-module format.
- *
- * The published worker graph also reaches wasm-bindgen's ESM WebAssembly
- * integration during dev/E2E. Vite does not transform that syntax by default,
- * so vite-plugin-wasm and vite-plugin-top-level-await are applied to the main
- * dev graph and to worker builds explicitly.
- */
 const jazzRuntimeConfig = buildJazzViteConfig({});
 
 const require = createRequire(import.meta.url);
@@ -29,13 +20,6 @@ const jazzToolsRequire = createRequire(resolve(jazzToolsPackageRoot, "package.js
 const jazzWasmEntry = jazzToolsRequire.resolve("jazz-wasm");
 const jazzViteAliases = jazzRuntimeConfig.resolve?.alias ?? [];
 
-/**
- * The published package intentionally ships the dedicated worker as normal
- * transpiled ESM, not as one self-contained browser file. Point local E2E entry
- * modules at the package files and let Vite transform the complete dependency
- * graph. This is different from serving dist/worker/jazz-worker.js verbatim,
- * which leaves its ../runtime imports and dynamic jazz-wasm import unresolved.
- */
 const testWorkerAliases = [
   {
     find: /^@jazz-test-worker-entry$/,
@@ -57,12 +41,6 @@ const testRuntimeFiles = new Map<string, { path: string; contentType: string }>(
   ],
 ]);
 
-/**
- * Browser E2E uses a real host bundle plus the separately-built embedded
- * Inspector. Both clients receive explicit worker URLs pointing at local test
- * entry modules in Vite's normal module graph, while the WASM binary is served
- * at one stable same-origin URL.
- */
 function inspectorBrowserTestRuntimePlugin(): Plugin {
   return {
     name: "inspector-browser-test-runtime",
@@ -96,7 +74,6 @@ const sharedConfig = {
   },
   worker: {
     ...(jazzRuntimeConfig.worker ?? {}),
-    // Vite requires fresh plugin instances for parallel worker builds.
     plugins: () => createWasmPlugins(),
   },
 };
@@ -117,7 +94,6 @@ export default defineConfig(({ mode }): UserConfig => {
     };
   }
 
-  // The standalone "web" build (the default).
   return {
     ...sharedConfig,
     plugins,
@@ -129,3 +105,6 @@ export default defineConfig(({ mode }): UserConfig => {
     },
   };
 });
+```
+
+Why both plugin locations: the main plugin array fixes dev-module transforms; `worker.plugins` supplies fresh instances for worker bundles, as required by Vite's worker plugin contract.
