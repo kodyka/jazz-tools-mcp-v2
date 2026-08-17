@@ -91,13 +91,17 @@ test.describe("inspector overlay (embedded, own worker connection end-to-end)", 
 
     const inspector = page.frameLocator('iframe[title="jazz-inspector"]');
 
+    // The public host-handle contract republishes the resolved broker worker URL
+    // so the overlay joins the host's persistent store. It intentionally does
+    // not promise the host's wasmUrl; that is consumed by the host runtime and
+    // is not part of buildOverlayDbConfig().
     const runtimeSources = await page.evaluate(
       () =>
         (
           window as unknown as {
             __jazzInspectorHost?: {
               getConnectionConfig(): {
-                runtimeSources?: { brokerWorkerUrl?: string; wasmUrl?: string };
+                runtimeSources?: { brokerWorkerUrl?: string };
               };
             };
           }
@@ -106,8 +110,10 @@ test.describe("inspector overlay (embedded, own worker connection end-to-end)", 
     expect(runtimeSources?.brokerWorkerUrl).toBe(
       new URL("/tests/browser/jazz-test-broker-worker.ts", page.url()).href,
     );
-    expect(runtimeSources?.wasmUrl).toBe(new URL("/__jazz/test-runtime", page.url()).href);
 
+    // Assert behavior after the public config check: the embedded Inspector must
+    // connect with its own worker client, discover the host schema, and receive
+    // the host's active subscription list.
     await expect(inspector.getByText("Connecting…")).toBeHidden({ timeout: 30_000 });
 
     await expect(inspector.getByRole("link", { name: "Data Explorer" })).toBeVisible({
