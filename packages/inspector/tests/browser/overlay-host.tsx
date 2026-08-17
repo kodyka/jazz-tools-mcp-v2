@@ -66,6 +66,11 @@ function HostApp() {
     userBranch: TEST_BRANCH,
     serverUrl: SERVER_URL,
     secret,
+    // Subscription traces are registered when subscribeAll() starts. The host
+    // query mounts before installInspectorHost() can run its effect, so enable
+    // dev mode at Db construction time to make this fixture deterministic and
+    // test the same telemetry the overlay is designed to display.
+    devMode: true,
     // Keep the Worker and SharedWorker on explicit same-origin Vite module URLs.
     // These tiny entry modules import the pinned jazz-tools worker files through
     // aliases in vite.config.ts, allowing Vite to transform their complete ESM
