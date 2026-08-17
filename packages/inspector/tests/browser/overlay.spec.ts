@@ -90,17 +90,22 @@ test.describe("inspector overlay (embedded, own worker connection end-to-end)", 
 
     const inspector = page.frameLocator('iframe[title="jazz-inspector"]');
 
-    const brokerWorkerUrl = await page.evaluate(
+    const runtimeSources = await page.evaluate(
       () =>
         (
           window as unknown as {
             __jazzInspectorHost?: {
-              getConnectionConfig(): { runtimeSources?: { brokerWorkerUrl?: string } };
+              getConnectionConfig(): {
+                runtimeSources?: { brokerWorkerUrl?: string; wasmUrl?: string };
+              };
             };
           }
-        ).__jazzInspectorHost?.getConnectionConfig().runtimeSources?.brokerWorkerUrl,
+        ).__jazzInspectorHost?.getConnectionConfig().runtimeSources,
     );
-    expect(brokerWorkerUrl).toBe(new URL("/__jazz/test-broker-worker.js", page.url()).href);
+    expect(runtimeSources?.brokerWorkerUrl).toBe(
+      new URL("/__jazz/test-broker-worker.js", page.url()).href,
+    );
+    expect(runtimeSources?.wasmUrl).toBe(new URL("/__jazz/test-runtime", page.url()).href);
 
     await expect(inspector.getByText("Connecting…")).toBeHidden({ timeout: 30_000 });
 

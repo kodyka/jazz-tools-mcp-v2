@@ -4,28 +4,48 @@ Parent: Task 00
 Priority: P0
 Status: implementation iterating under CI
 
-## Problem
+## Failure sequence and fixes
 
-The original `pnpm test:browser` run passed 12 tests and failed the embedded overlay test because the Vite dev server rejected WebAssembly ESM integration while transforming the published Jazz worker graph.
+### Baseline
 
-## First fix and CI feedback
+`pnpm test:browser` passed 12 tests and failed the embedded overlay because Vite rejected WebAssembly ESM integration while transforming the published Jazz worker graph.
 
-Adding both `vite-plugin-wasm` and `vite-plugin-top-level-await` removed the missing-WASM-transform design gap, but CI then failed earlier during `pnpm build`: `vite-plugin-top-level-await` crashed in its SWC print step with `missing field type` while bundling the Jazz worker.
+### Iteration 1
 
-## Revised implementation
+Adding `vite-plugin-wasm` plus `vite-plugin-top-level-await` moved the failure earlier to `pnpm build`: the top-level-await plugin crashed in its SWC print path with `missing field type`.
 
-`vite-plugin-wasm` itself emits top-level `await`. Its documented alternative to the TLA rewrite plugin is to target modern ESM (`build.target = "esnext"`). The Inspector already targets a modern development/admin browser runtime.
+### Iteration 2
+
+Keeping `vite-plugin-wasm`, setting `build.target = "esnext"`, and removing the active top-level-await rewrite fixed unit/build/Vercel gates. Browser E2E then exposed a second issue: Jazz puts `runtimeSources.wasmUrl` in the worker module query string, and `vite-plugin-wasm@3.6.0` uses a simple `id.endsWith(".wasm")` check. A worker URL such as:
+
+```text
+/tests/browser/jazz-test-worker.ts?jazz-wasm-url=.../__jazz/test-runtime.wasm
+```
+
+was therefore misclassified as a local WASM file and failed with ENOENT.
+
+### Iteration 3
+
+Serve the same test binary from an extensionless URL:
+
+```text
+/__jazz/test-runtime
+```
+
+with `Content-Type: application/wasm`. Jazz receives the same explicit binary URL, while the worker module ID can no longer satisfy the plugin's `.endsWith(".wasm")` matcher.
+
+## Checklist
 
 - [x] preserve Jazz `buildJazzViteConfig()` aliases/optimizer settings;
 - [x] apply `vite-plugin-wasm` to the normal Vite graph;
 - [x] apply fresh `vite-plugin-wasm` instances via `worker.plugins`;
 - [x] set standalone and embedded build target to `esnext`;
 - [x] remove `vite-plugin-top-level-await` from the active plugin graph;
-- [ ] confirm standalone build passes;
-- [ ] confirm embedded build passes;
-- [ ] confirm embedded overlay Playwright test passes;
+- [x] make the test runtime WASM URL extensionless while preserving WASM content type;
+- [x] assert the published host handle exposes the expected extensionless `wasmUrl`;
+- [ ] confirm final CI embedded overlay passes;
 - [ ] confirm full Inspector CI passes.
 
 ## Acceptance
 
-The build and embedded overlay both load Jazz WASM without disabling tests, bypassing Jazz workers, or introducing a second runtime path.
+The standalone/embedded builds and all 13 browser tests pass without disabling the embedded test, bypassing Jazz workers, or introducing a second data/runtime architecture.

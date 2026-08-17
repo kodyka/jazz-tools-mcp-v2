@@ -19,7 +19,10 @@ const TEST_PORT = 19879;
 const SERVER_URL = `http://127.0.0.1:${TEST_PORT}`;
 const TEST_WORKER_URL = "/tests/browser/jazz-test-worker.ts";
 const TEST_BROKER_WORKER_URL = "/tests/browser/jazz-test-broker-worker.ts";
-const TEST_WASM_URL = "/__jazz/test-runtime.wasm";
+// Intentionally extensionless. Jazz transports this URL in the worker module's
+// query string; ending the value in `.wasm` makes vite-plugin-wasm misclassify
+// the worker module ID as a WASM file.
+const TEST_WASM_URL = "/__jazz/test-runtime";
 
 function HostInner() {
   const { db } = useJazzClient();

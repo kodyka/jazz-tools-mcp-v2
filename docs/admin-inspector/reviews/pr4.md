@@ -8,25 +8,33 @@ The core architecture is correct: retain runtime schema discovery, generic Jazz 
 
 ## CI evidence reviewed
 
-Original failing run:
+### Baseline
 - root MCP passed;
 - Inspector unit tests: 84 passed;
 - TypeScript/build passed;
 - Vercel build passed;
-- Playwright: 12 passed, 1 failed (embedded overlay WASM transform).
+- Playwright: 12 passed, 1 failed because Vite did not transform WebAssembly ESM in the embedded worker graph.
 
-First hardening run after adding both WASM and top-level-await plugins:
+### Hardening run #68
 - Inspector unit tests: 84 passed;
-- `pnpm build` failed before Playwright;
-- failure came from `vite-plugin-top-level-await` SWC printing (`missing field type`) while bundling the Jazz worker.
+- `pnpm build` failed inside `vite-plugin-top-level-await` SWC printing (`missing field type`).
 
-The revised fix keeps `vite-plugin-wasm`, targets `esnext`, and removes the incompatible TLA rewrite plugin from the active graph.
+### Hardening run #69
+- root MCP job passed completely;
+- Inspector unit tests: 84 passed;
+- standalone and embedded builds passed;
+- Vercel build passed;
+- Playwright again reached 12 passed / 1 failed;
+- the original unsupported-WASM error was gone;
+- the remaining failure was `vite-plugin-wasm@3.6.0` misclassifying the worker module URL as a WASM file because the `jazz-wasm-url` query value ended in `.wasm`.
+
+The next fix makes the test-only runtime URL extensionless while continuing to serve the real binary with `application/wasm`.
 
 ## Bugs found
 
 ### P0 — embedded overlay Jazz WASM path
 
-Preserve Jazz's `buildJazzViteConfig()` and add the consumer-side WASM ESM transform required by the extracted published-package worker graph. Use fresh WASM plugin instances for worker builds and `build.target = "esnext"` so the generated top-level await remains native.
+Keep Jazz's `buildJazzViteConfig()`, use `vite-plugin-wasm`, target `esnext`, and ensure the explicit test `wasmUrl` cannot make a non-WASM worker module ID end in `.wasm`.
 
 ### P1 — grid toolbar schema route still has a raw runtime table segment
 

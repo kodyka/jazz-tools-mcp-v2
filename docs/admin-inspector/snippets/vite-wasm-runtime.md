@@ -1,6 +1,10 @@
 # Full snippet — Vite WASM runtime/E2E configuration
 
-The published Jazz worker graph needs a WASM ESM transform in the extracted Inspector. `vite-plugin-wasm` emits top-level await, so this configuration targets `esnext` rather than running the incompatible `vite-plugin-top-level-await` SWC rewrite.
+The extracted Inspector needs three details simultaneously:
+
+1. Jazz's `buildJazzViteConfig()` for Jazz-specific aliases/optimizer behavior;
+2. `vite-plugin-wasm` for the published package's WebAssembly ESM graph;
+3. an extensionless **test runtime URL**, because Jazz transports that URL in the worker module query string and `vite-plugin-wasm@3.6.0` matches IDs using `endsWith(".wasm")`.
 
 ```ts
 import { readFileSync } from "node:fs";
@@ -29,9 +33,11 @@ const testWorkerAliases = [
   },
 ];
 
+// Deliberately no `.wasm` suffix: this URL is serialized into the worker
+// module's query string. The response still has the correct WASM content type.
 const testRuntimeFiles = new Map<string, { path: string; contentType: string }>([
   [
-    "/__jazz/test-runtime.wasm",
+    "/__jazz/test-runtime",
     {
       path: resolve(dirname(jazzWasmEntry), "jazz_wasm_bg.wasm"),
       contentType: "application/wasm",
@@ -107,4 +113,14 @@ export default defineConfig(({ mode }): UserConfig => {
 });
 ```
 
-`worker.plugins` returns fresh instances because Vite can build worker bundles in parallel. Keeping `buildJazzViteConfig()` is still required for the Jazz-specific alias and dependency-optimizer behavior.
+And the browser fixture must publish the same extensionless URL:
+
+```ts
+const TEST_WASM_URL = "/__jazz/test-runtime";
+
+runtimeSources: {
+  workerUrl: new URL(TEST_WORKER_URL, origin).href,
+  brokerWorkerUrl: new URL(TEST_BROKER_WORKER_URL, origin).href,
+  wasmUrl: new URL(TEST_WASM_URL, origin).href,
+},
+```

@@ -48,9 +48,15 @@ const testWorkerAliases = [
   },
 ];
 
+/**
+ * Keep this route extensionless. Jazz passes `wasmUrl` through a query parameter
+ * on the worker module URL. `vite-plugin-wasm@3.6.0` detects WASM with a simple
+ * `id.endsWith(".wasm")`; if this runtime URL ends in `.wasm`, the plugin can
+ * mistake the whole worker module ID for a local WASM file.
+ */
 const testRuntimeFiles = new Map<string, { path: string; contentType: string }>([
   [
-    "/__jazz/test-runtime.wasm",
+    "/__jazz/test-runtime",
     {
       path: resolve(dirname(jazzWasmEntry), "jazz_wasm_bg.wasm"),
       contentType: "application/wasm",
