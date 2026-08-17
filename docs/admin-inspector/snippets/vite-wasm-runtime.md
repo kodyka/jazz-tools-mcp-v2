@@ -1,6 +1,6 @@
 # Full snippet — Vite WASM runtime/E2E configuration
 
-This is the complete intended `packages/inspector/vite.config.ts` shape for the extracted published-package setup.
+The published Jazz worker graph needs a WASM ESM transform in the extracted Inspector. `vite-plugin-wasm` emits top-level await, so this configuration targets `esnext` rather than running the incompatible `vite-plugin-top-level-await` SWC rewrite.
 
 ```ts
 import { readFileSync } from "node:fs";
@@ -9,11 +9,9 @@ import { dirname, resolve } from "node:path";
 import react from "@vitejs/plugin-react-swc";
 import { buildJazzViteConfig } from "jazz-tools/dev/vite";
 import { defineConfig, type Plugin, type UserConfig } from "vite";
-import topLevelAwait from "vite-plugin-top-level-await";
 import wasm from "vite-plugin-wasm";
 
 const jazzRuntimeConfig = buildJazzViteConfig({});
-
 const require = createRequire(import.meta.url);
 const jazzToolsPackageRoot = dirname(require.resolve("jazz-tools/package.json"));
 const jazzToolsRequire = createRequire(resolve(jazzToolsPackageRoot, "package.json"));
@@ -63,7 +61,7 @@ function inspectorBrowserTestRuntimePlugin(): Plugin {
 }
 
 function createWasmPlugins() {
-  return [wasm(), topLevelAwait()];
+  return [wasm()];
 }
 
 const sharedConfig = {
@@ -87,6 +85,7 @@ export default defineConfig(({ mode }): UserConfig => {
       plugins,
       base: "./",
       build: {
+        target: "esnext",
         outDir: "dist-embedded",
         emptyOutDir: true,
         rollupOptions: { input: { index: resolve(__dirname, "embedded.html") } },
@@ -100,6 +99,7 @@ export default defineConfig(({ mode }): UserConfig => {
     base: "/",
     publicDir: "public",
     build: {
+      target: "esnext",
       outDir: "dist",
       emptyOutDir: true,
     },
@@ -107,4 +107,4 @@ export default defineConfig(({ mode }): UserConfig => {
 });
 ```
 
-Why both plugin locations: the main plugin array fixes dev-module transforms; `worker.plugins` supplies fresh instances for worker bundles, as required by Vite's worker plugin contract.
+`worker.plugins` returns fresh instances because Vite can build worker bundles in parallel. Keeping `buildJazzViteConfig()` is still required for the Jazz-specific alias and dependency-optimizer behavior.

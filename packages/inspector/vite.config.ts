@@ -4,7 +4,6 @@ import { dirname, resolve } from "node:path";
 import react from "@vitejs/plugin-react-swc";
 import { buildJazzViteConfig } from "jazz-tools/dev/vite";
 import { defineConfig, type Plugin, type UserConfig } from "vite";
-import topLevelAwait from "vite-plugin-top-level-await";
 import wasm from "vite-plugin-wasm";
 
 /**
@@ -18,8 +17,10 @@ import wasm from "vite-plugin-wasm";
  *
  * The published worker graph also reaches wasm-bindgen's ESM WebAssembly
  * integration during dev/E2E. Vite does not transform that syntax by default,
- * so vite-plugin-wasm and vite-plugin-top-level-await are applied to the main
- * dev graph and to worker builds explicitly.
+ * so vite-plugin-wasm is applied to the main dev graph and worker builds.
+ * The plugin emits top-level await; targeting esnext avoids the incompatible
+ * vite-plugin-top-level-await/SWC rewrite while matching the modern-browser
+ * Inspector runtime.
  */
 const jazzRuntimeConfig = buildJazzViteConfig({});
 
@@ -85,7 +86,7 @@ function inspectorBrowserTestRuntimePlugin(): Plugin {
 }
 
 function createWasmPlugins() {
-  return [wasm(), topLevelAwait()];
+  return [wasm()];
 }
 
 const sharedConfig = {
@@ -110,6 +111,7 @@ export default defineConfig(({ mode }): UserConfig => {
       plugins,
       base: "./",
       build: {
+        target: "esnext",
         outDir: "dist-embedded",
         emptyOutDir: true,
         rollupOptions: { input: { index: resolve(__dirname, "embedded.html") } },
@@ -124,6 +126,7 @@ export default defineConfig(({ mode }): UserConfig => {
     base: "/",
     publicDir: "public",
     build: {
+      target: "esnext",
       outDir: "dist",
       emptyOutDir: true,
     },

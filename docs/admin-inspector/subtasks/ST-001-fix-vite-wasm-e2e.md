@@ -2,31 +2,30 @@
 
 Parent: Task 00
 Priority: P0
-Status: implemented in this PR update
+Status: implementation iterating under CI
 
 ## Problem
 
-`pnpm test:browser` passed 12 tests and failed the embedded overlay test. The Vite dev server failed while transforming the published Jazz worker graph:
+The original `pnpm test:browser` run passed 12 tests and failed the embedded overlay test because the Vite dev server rejected WebAssembly ESM integration while transforming the published Jazz worker graph.
 
-```text
-"ESM integration proposal for Wasm" is not supported currently
-```
+## First fix and CI feedback
 
-The failing request was the test Jazz worker; the host never reached `Host ready`.
+Adding both `vite-plugin-wasm` and `vite-plugin-top-level-await` removed the missing-WASM-transform design gap, but CI then failed earlier during `pnpm build`: `vite-plugin-top-level-await` crashed in its SWC print step with `missing field type` while bundling the Jazz worker.
 
-## Root cause
+## Revised implementation
 
-`buildJazzViteConfig()` correctly excludes/aliases `jazz-wasm` and sets ES worker format, but it does not install a WASM ESM transform. The repository already has `vite-plugin-wasm` and `vite-plugin-top-level-await` in dev dependencies.
+`vite-plugin-wasm` itself emits top-level `await`. Its documented alternative to the TLA rewrite plugin is to target modern ESM (`build.target = "esnext"`). The Inspector already targets a modern development/admin browser runtime.
 
-## Implementation
-
-- [x] import both plugins in `vite.config.ts`;
-- [x] create a factory returning fresh plugin instances;
-- [x] apply them to the normal Vite plugin graph;
-- [x] apply them through `worker.plugins: () => [...]`;
-- [x] preserve Jazz aliases, optimizer exclusion, test worker aliases, and stable test WASM middleware;
-- [ ] verify the new GitHub Actions run is green.
+- [x] preserve Jazz `buildJazzViteConfig()` aliases/optimizer settings;
+- [x] apply `vite-plugin-wasm` to the normal Vite graph;
+- [x] apply fresh `vite-plugin-wasm` instances via `worker.plugins`;
+- [x] set standalone and embedded build target to `esnext`;
+- [x] remove `vite-plugin-top-level-await` from the active plugin graph;
+- [ ] confirm standalone build passes;
+- [ ] confirm embedded build passes;
+- [ ] confirm embedded overlay Playwright test passes;
+- [ ] confirm full Inspector CI passes.
 
 ## Acceptance
 
-The embedded overlay host starts, its Jazz worker loads, and all Playwright tests pass without disabling the test or weakening its assertions.
+The build and embedded overlay both load Jazz WASM without disabling tests, bypassing Jazz workers, or introducing a second runtime path.
